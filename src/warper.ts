@@ -1,18 +1,6 @@
 import { cached, DAY } from './cache.ts';
-import { commonsDateYear, yearIn } from './commons.ts';
-import type { City } from './config.ts';
-
-/** A Commons map georeferenced on Wikimaps Warper. */
-export interface HistoricMap {
-  id: string;
-  title: string;
-  year: number | null;
-  bbox: [number, number, number, number];
-  tiles: string;
-  /** Commons file name, without the File: prefix. */
-  file: string;
-  commons: string;
-}
+import { commonsDateYear, commonsThumb, yearIn } from './commons.ts';
+import type { City, HistoricMap } from './config.ts';
 
 interface WarperMap {
   id: string;
@@ -25,13 +13,17 @@ interface CommonsPage {
   imageinfo?: { extmetadata?: { DateTimeOriginal?: { value: string } } }[];
 }
 
-const WARPER_API = 'https://warper.wmflabs.org/api/v1/maps';
+const WARPER = 'https://warper.wmflabs.org';
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
 const COMMONS_BATCH = 50;
 
+/** Oldest first, undated maps last. */
+export const compareMaps = (a: HistoricMap, b: HistoricMap) =>
+  (a.year ?? Infinity) - (b.year ?? Infinity) || a.title.localeCompare(b.title);
+
 /** Live maps from Warper, falling back to the city's snapshot in public/data when Warper is unreachable. */
 export const loadHistoricMaps = (city: City) =>
-  cached(`maps:${city.id}`, DAY, async () => {
+  cached(`maps:v2:${city.id}`, DAY, async () => {
     try {
       return await fetchHistoricMaps(city.bbox);
     } catch (error) {
@@ -44,7 +36,7 @@ export const loadHistoricMaps = (city: City) =>
 
 /** Warped maps lying entirely inside `bbox` (west, south, east, north). */
 export async function fetchHistoricMaps(bbox: City['bbox'], init: RequestInit = {}): Promise<HistoricMap[]> {
-  const url = `${WARPER_API}?format=json&per_page=100&operation=within&bbox=${bbox.join(',')}`;
+  const url = `${WARPER}/api/v1/maps?format=json&per_page=100&operation=within&bbox=${bbox.join(',')}`;
   const res = await fetch(url, init);
   if (!res.ok) throw new Error(`Warper request failed (HTTP ${res.status})`);
   const { data } = (await res.json()) as { data: WarperMap[] };
@@ -56,17 +48,22 @@ export async function fetchHistoricMaps(bbox: City['bbox'], init: RequestInit = 
   );
 
   return warped
-    .map((m) => ({
-      id: m.id,
-      title: m.attributes.title.replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, ''),
-      // A year in the file name is usually the map's own date; Commons metadata is the fallback.
-      year: yearIn(m.attributes.title) ?? dates.get(m.attributes.title) ?? null,
-      bbox: m.attributes.bbox!.split(',').map(Number) as HistoricMap['bbox'],
-      tiles: m.links.tiles,
-      file: m.attributes.title.replace(/^File:/, ''),
-      commons: m.attributes.source_uri,
-    }))
-    .sort((a, b) => (a.year ?? Infinity) - (b.year ?? Infinity) || a.title.localeCompare(b.title));
+    .map((m): HistoricMap => {
+      const file = m.attributes.title.replace(/^File:/, '');
+      const title = file.replace(/\.[a-z0-9]+$/i, '');
+      return {
+        id: `warper-${m.id}`,
+        title,
+        // A year in the file name is usually the map's own date; Commons metadata is the fallback.
+        year: yearIn(m.attributes.title) ?? dates.get(m.attributes.title) ?? null,
+        bbox: m.attributes.bbox!.split(',').map(Number) as HistoricMap['bbox'],
+        tiles: m.links.tiles,
+        thumb: commonsThumb(file, 120),
+        link: { label: 'Commons', href: m.attributes.source_uri },
+        attribution: `<a href="${escapeHtml(m.attributes.source_uri)}" target="_blank">${escapeHtml(title)}</a> via <a href="${WARPER}/" target="_blank">Wikimaps Warper</a>`,
+      };
+    })
+    .sort(compareMaps);
 }
 
 async function commonsYears(titles: string[], init: RequestInit): Promise<Map<string, number>> {
@@ -94,4 +91,8 @@ async function commonsYears(titles: string[], init: RequestInit): Promise<Map<st
     }
   }
   return years;
+}
+
+function escapeHtml(text: string) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

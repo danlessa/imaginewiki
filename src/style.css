@@ -605,6 +605,19 @@ dialog li {
   font-size: 13px;
 }
 
+/* ------------------------------------------------------------------ georeference */
+
+.georef {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.section-heading {
+  margin: 14px 16px 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
 /* ------------------------------------------------------------------ locate */
 
 .panel-intro {

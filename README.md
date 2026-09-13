@@ -9,6 +9,8 @@ A historical atlas of Brazilian cities (São Paulo by default, plus Rio de Janei
 | Views | Wikimedia Commons | Geotagged files inside the city that no Wikidata item uses, with a date (not from Exif) before 1970 and the heading from `{{Location}}`. Collected ahead of time into `public/data/commons-views-<city>.json` |
 | Landmarks | Wikidata | Items in the city's bounding box with an image and a start date (`P571`/`P580`), hidden after their end date (`P576`/`P582`) |
 | Maps & Plans | [Wikimaps Warper](https://warper.wmflabs.org/) | Commons maps georeferenced by volunteers, shown as raster overlays with adjustable opacity |
+| Maps & Plans | [GeoSampa](https://geosampa.prefeitura.sp.gov.br/) (Prefeitura de São Paulo) | 1930 SARA Brasil map and 1954 VASP Cruzeiro survey charts, via WMS. CC BY-SA 4.0 per GeoSampa's data licence |
+| Maps & Plans | [Pauliceia 2.0](https://pauliceia.unifesp.br/) (UNIFESP) | Plans of São Paulo from 1868, 1877, 1881, 1890, 1905 and 1924, via cached TMS tiles. No licence is published; CC BY-SA is assumed until UNIFESP confirms |
 
 Wikidata, Warper and OpenHistoricalMap are fetched live from the browser and cached in `localStorage` for a day. Commons can't filter geotagged files by date, so finding its old photographs takes hundreds of requests and is done ahead of time by a script. If Warper is down, the app falls back to `public/data/warper-maps-<city>.json`.
 
@@ -31,6 +33,12 @@ Cities are defined in `src/config.ts` (centre, zoom, bounding box and the Common
 ## Locating photographs
 
 The Locate tab lists photographs from each city's Commons categories that have no camera or object location, neither as a template nor as structured data. A contributor places the camera and its heading on the map, copies the generated `{{Location|lat|lon|heading:…}}` template and pastes it into the file page on Commons. The location is saved on Commons, where every project can use it; imagineWiki stores nothing.
+
+## Georeferencing maps
+
+Below the map list, Maps & Plans lists old maps in each city's Commons categories (`mapCategories` in `src/config.ts`) that aren't in Commons' "Georeferenced maps in Wikimaps Warper" category. Each links to Warper's import page, where contributors sign in with a Wikimedia account and place control points. Warper saves the result openly and Commons records it, and the map then appears in imagineWiki through the regular Warper query.
+
+Maps from other open tile servers are configured per city as `overlays` in `src/config.ts`.
 
 ## Improving the map
 

@@ -1,6 +1,6 @@
 [
   {
-    "id": "3530",
+    "id": "warper-3530",
     "title": "L'entrée de l'escadre de Duguay-Trouin à Rio en 1711",
     "year": 1711,
     "bbox": [
@@ -10,11 +10,15 @@
       -22.7704391
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3530/{z}/{x}/{y}.png",
-    "file": "L'entrée de l'escadre de Duguay-Trouin à Rio en 1711.jpg",
-    "commons": "https://commons.wikimedia.org/wiki/File:L%27entr%C3%A9e_de_l%27escadre_de_Duguay-Trouin_%C3%A0_Rio_en_1711.jpg"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/L'entr%C3%A9e%20de%20l'escadre%20de%20Duguay-Trouin%20%C3%A0%20Rio%20en%201711.jpg?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:L%27entr%C3%A9e_de_l%27escadre_de_Duguay-Trouin_%C3%A0_Rio_en_1711.jpg"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:L%27entr%C3%A9e_de_l%27escadre_de_Duguay-Trouin_%C3%A0_Rio_en_1711.jpg\" target=\"_blank\">L'entrée de l'escadre de Duguay-Trouin à Rio en 1711</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "3454",
+    "id": "warper-3454",
     "title": "Passeio1862-JoaqManMacedo-Um Passeio pela cidade do RJ",
     "year": 1862,
     "bbox": [
@@ -24,11 +28,15 @@
       -22.9121873
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3454/{z}/{x}/{y}.png",
-    "file": "Passeio1862-JoaqManMacedo-Um Passeio pela cidade do RJ.jpg",
-    "commons": "https://commons.wikimedia.org/wiki/File:Passeio1862-JoaqManMacedo-Um_Passeio_pela_cidade_do_RJ.jpg"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Passeio1862-JoaqManMacedo-Um%20Passeio%20pela%20cidade%20do%20RJ.jpg?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Passeio1862-JoaqManMacedo-Um_Passeio_pela_cidade_do_RJ.jpg"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Passeio1862-JoaqManMacedo-Um_Passeio_pela_cidade_do_RJ.jpg\" target=\"_blank\">Passeio1862-JoaqManMacedo-Um Passeio pela cidade do RJ</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "3529",
+    "id": "warper-3529",
     "title": "Mapa IIFA de Glasl",
     "year": 1863,
     "bbox": [
@@ -38,11 +46,15 @@
       -22.9592014
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3529/{z}/{x}/{y}.png",
-    "file": "Mapa IIFA de Glasl.jpg",
-    "commons": "https://commons.wikimedia.org/wiki/File:Mapa_IIFA_de_Glasl.jpg"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Mapa%20IIFA%20de%20Glasl.jpg?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Mapa_IIFA_de_Glasl.jpg"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Mapa_IIFA_de_Glasl.jpg\" target=\"_blank\">Mapa IIFA de Glasl</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "3457",
+    "id": "warper-3457",
     "title": "Rio de Janeiro city - Commercial Distric. LOC 2012593123",
     "year": 1900,
     "bbox": [
@@ -52,11 +64,15 @@
       -22.8857347
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3457/{z}/{x}/{y}.png",
-    "file": "Rio de Janeiro city - Commercial Distric. LOC 2012593123.tif",
-    "commons": "https://commons.wikimedia.org/wiki/File:Rio_de_Janeiro_city_-_Commercial_Distric._LOC_2012593123.tif"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Rio%20de%20Janeiro%20city%20-%20Commercial%20Distric.%20LOC%202012593123.tif?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Rio_de_Janeiro_city_-_Commercial_Distric._LOC_2012593123.tif"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Rio_de_Janeiro_city_-_Commercial_Distric._LOC_2012593123.tif\" target=\"_blank\">Rio de Janeiro city - Commercial Distric. LOC 2012593123</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "3455",
+    "id": "warper-3455",
     "title": "Distrito Federal, c.1903",
     "year": 1903,
     "bbox": [
@@ -66,11 +82,15 @@
       -22.7777866
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3455/{z}/{x}/{y}.png",
-    "file": "Distrito Federal, c.1903.jpg",
-    "commons": "https://commons.wikimedia.org/wiki/File:Distrito_Federal,_c.1903.jpg"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Distrito%20Federal%2C%20c.1903.jpg?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Distrito_Federal,_c.1903.jpg"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Distrito_Federal,_c.1903.jpg\" target=\"_blank\">Distrito Federal, c.1903</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "3456",
+    "id": "warper-3456",
     "title": "Rio de Janeiro Tramway Map 1906",
     "year": 1906,
     "bbox": [
@@ -80,11 +100,15 @@
       -22.8547017
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3456/{z}/{x}/{y}.png",
-    "file": "Rio de Janeiro Tramway Map 1906.jpeg",
-    "commons": "https://commons.wikimedia.org/wiki/File:Rio_de_Janeiro_Tramway_Map_1906.jpeg"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Rio%20de%20Janeiro%20Tramway%20Map%201906.jpeg?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Rio_de_Janeiro_Tramway_Map_1906.jpeg"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Rio_de_Janeiro_Tramway_Map_1906.jpeg\" target=\"_blank\">Rio de Janeiro Tramway Map 1906</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "3515",
+    "id": "warper-3515",
     "title": "Mapa da Cidade do Rio de Janeiro (1931)",
     "year": 1931,
     "bbox": [
@@ -94,11 +118,15 @@
       -22.8865052
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3515/{z}/{x}/{y}.png",
-    "file": "Mapa da Cidade do Rio de Janeiro (1931).tif",
-    "commons": "https://commons.wikimedia.org/wiki/File:Mapa_da_Cidade_do_Rio_de_Janeiro_(1931).tif"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Mapa%20da%20Cidade%20do%20Rio%20de%20Janeiro%20(1931).tif?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Mapa_da_Cidade_do_Rio_de_Janeiro_(1931).tif"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Mapa_da_Cidade_do_Rio_de_Janeiro_(1931).tif\" target=\"_blank\">Mapa da Cidade do Rio de Janeiro (1931)</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "1772",
+    "id": "warper-1772",
     "title": "NovasViasCariocas-TransOeste, TransCarioca e TransOlímpica",
     "year": 2012,
     "bbox": [
@@ -108,11 +136,15 @@
       -22.744319099357607
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/1772/{z}/{x}/{y}.png",
-    "file": "NovasViasCariocas-TransOeste, TransCarioca e TransOlímpica.jpg",
-    "commons": "https://commons.wikimedia.org/wiki/File:NovasViasCariocas-TransOeste,_TransCarioca_e_TransOl%C3%ADmpica.jpg"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/NovasViasCariocas-TransOeste%2C%20TransCarioca%20e%20TransOl%C3%ADmpica.jpg?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:NovasViasCariocas-TransOeste,_TransCarioca_e_TransOl%C3%ADmpica.jpg"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:NovasViasCariocas-TransOeste,_TransCarioca_e_TransOl%C3%ADmpica.jpg\" target=\"_blank\">NovasViasCariocas-TransOeste, TransCarioca e TransOlímpica</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "3469",
+    "id": "warper-3469",
     "title": "Diagrama metro rio",
     "year": 2019,
     "bbox": [
@@ -122,11 +154,15 @@
       -22.7585154
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3469/{z}/{x}/{y}.png",
-    "file": "Diagrama metro rio.png",
-    "commons": "https://commons.wikimedia.org/wiki/File:Diagrama_metro_rio.png"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Diagrama%20metro%20rio.png?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Diagrama_metro_rio.png"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Diagrama_metro_rio.png\" target=\"_blank\">Diagrama metro rio</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "3589",
+    "id": "warper-3589",
     "title": "Mapa do Bosque da Barra",
     "year": null,
     "bbox": [
@@ -136,11 +172,15 @@
       -22.9829086
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3589/{z}/{x}/{y}.png",
-    "file": "Mapa do Bosque da Barra.jpg",
-    "commons": "https://commons.wikimedia.org/wiki/File:Mapa_do_Bosque_da_Barra.jpg"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Mapa%20do%20Bosque%20da%20Barra.jpg?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Mapa_do_Bosque_da_Barra.jpg"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Mapa_do_Bosque_da_Barra.jpg\" target=\"_blank\">Mapa do Bosque da Barra</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   },
   {
-    "id": "3531",
+    "id": "warper-3531",
     "title": "Plan de la baye, ville, forteresses, et attaques de Rio Janeiro",
     "year": null,
     "bbox": [
@@ -150,7 +190,11 @@
       -22.7743979
     ],
     "tiles": "https://warper.wmflabs.org/maps/tile/3531/{z}/{x}/{y}.png",
-    "file": "Plan de la baye, ville, forteresses, et attaques de Rio Janeiro.jpg",
-    "commons": "https://commons.wikimedia.org/wiki/File:Plan_de_la_baye,_ville,_forteresses,_et_attaques_de_Rio_Janeiro.jpg"
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Plan%20de%20la%20baye%2C%20ville%2C%20forteresses%2C%20et%20attaques%20de%20Rio%20Janeiro.jpg?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Plan_de_la_baye,_ville,_forteresses,_et_attaques_de_Rio_Janeiro.jpg"
+    },
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Plan_de_la_baye,_ville,_forteresses,_et_attaques_de_Rio_Janeiro.jpg\" target=\"_blank\">Plan de la baye, ville, forteresses, et attaques de Rio Janeiro</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
   }
 ]

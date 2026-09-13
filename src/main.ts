@@ -19,16 +19,18 @@ import {
   commonsPage,
   commonsThumb,
   loadCommonsViews,
+  loadGeoreferenceCandidates,
   loadLocateCandidates,
   locationTemplate,
-  type LocateCandidate,
+  warperImportUrl,
+  type CommonsFile,
 } from './commons.ts';
-import { CITIES, DEFAULT_CITY, DEFAULT_YEAR, MAX_YEAR, MIN_YEAR, OHM_STYLE } from './config.ts';
+import { CITIES, DEFAULT_CITY, DEFAULT_YEAR, MAX_YEAR, MIN_YEAR, OHM_STYLE, type HistoricMap } from './config.ts';
 import { $, el } from './dom.ts';
 import { landmarkPoints, mapFootprints, viewCones, viewPoints } from './geo.ts';
 import { PlacementTool, type Placement } from './locate.ts';
 import { applyDateFilter, softenBasemap, styleFont } from './ohm.ts';
-import { loadHistoricMaps, type HistoricMap } from './warper.ts';
+import { compareMaps, loadHistoricMaps } from './warper.ts';
 import { loadLandmarks, loadViews, type Landmark, type View } from './wikidata.ts';
 
 // MapLibre locates its worker relative to its own module URL, which bundling breaks,
@@ -69,7 +71,9 @@ const state = {
   views: [] as View[],
   landmarks: [] as Landmark[],
   maps: [] as HistoricMap[],
-  candidates: [] as LocateCandidate[],
+  candidates: [] as CommonsFile[],
+  mapCandidates: [] as CommonsFile[],
+  mapCandidatesLoaded: false,
   loaded: { views: false, maps: false, landmarks: false, locate: false } as Record<Tab, boolean>,
   overlays: new Map<string, number>(),
   selected: null as Selection | null,
@@ -123,13 +127,18 @@ async function loadData() {
       })
       .catch((error) => setStatus('landmarks', `Could not load landmarks: ${error.message}`)),
     loadHistoricMaps(city)
-      .then((maps) => {
+      // The city's own overlays still load when Warper and its snapshot are both unreachable.
+      .catch((error) => {
+        console.warn('Wikimaps Warper maps unavailable', error);
+        return [] as HistoricMap[];
+      })
+      .then((warperMaps) => {
+        const maps = [...city.overlays, ...warperMaps].sort(compareMaps);
         state.maps = maps;
         source('map-footprints').setData(mapFootprints(maps));
         state.loaded.maps = true;
         renderMapMarkers();
-      })
-      .catch((error) => setStatus('maps', `Could not load maps: ${error.message}`)),
+      }),
   ].map((load) => load.finally(scheduleRender)));
 }
 
@@ -234,7 +243,7 @@ function scheduleDateFilter() {
 }
 
 function toggleOverlay(m: HistoricMap) {
-  const id = `warper-${m.id}`;
+  const id = `overlay-${m.id}`;
   if (state.overlays.has(m.id)) {
     map.removeLayer(id);
     map.removeSource(id);
@@ -244,13 +253,17 @@ function toggleOverlay(m: HistoricMap) {
       type: 'raster',
       tiles: [m.tiles],
       tileSize: 256,
+      scheme: m.scheme ?? 'xyz',
       bounds: m.bbox,
-      attribution: `<a href="${m.commons}" target="_blank">${m.title}</a>`,
+      attribution: m.attribution,
     });
     // Overlays sit above the basemap and below photographs and landmarks.
     map.addLayer({ id, type: 'raster', source: id, paint: { 'raster-opacity': OVERLAY_OPACITY } }, 'map-footprints');
     state.overlays.set(m.id, OVERLAY_OPACITY);
-    map.fitBounds(m.bbox, { padding: 40, maxZoom: 16 });
+    // Only move the camera when the map is out of view; citywide surveys would otherwise zoom out to the metro area.
+    const { lng, lat } = map.getCenter();
+    const [west, south, east, north] = m.bbox;
+    if (lng < west || lng > east || lat < south || lat > north) map.fitBounds(m.bbox, { padding: 40, maxZoom: 16 });
     if (m.year != null) setYear(m.year);
   }
   scheduleRender();
@@ -258,7 +271,7 @@ function toggleOverlay(m: HistoricMap) {
 
 function setOverlayOpacity(m: HistoricMap, opacity: number) {
   state.overlays.set(m.id, opacity);
-  map.setPaintProperty(`warper-${m.id}`, 'raster-opacity', opacity);
+  map.setPaintProperty(`overlay-${m.id}`, 'raster-opacity', opacity);
 }
 
 // ---------------------------------------------------------------------------------------------- year
@@ -422,6 +435,7 @@ function setupSidebar() {
   });
   $('#subtitle').textContent = `${city.name} through time, from Wikimedia and OpenHistoricalMap`;
   document.title = `imagineWiki · ${city.name} through time`;
+  $('#georef').hidden = !city.mapCategories.length;
 
   const lightbox = $('#lightbox');
   lightbox.addEventListener('click', () => (lightbox.hidden = true));
@@ -431,6 +445,7 @@ function setupSidebar() {
 function selectTab(tab: Tab) {
   state.tab = tab;
   if (tab === 'locate') loadCandidatesOnce();
+  if (tab === 'maps') loadMapCandidatesOnce();
   for (const button of document.querySelectorAll<HTMLButtonElement>('.tabs button')) {
     button.classList.toggle('active', button.dataset.tab === tab);
   }
@@ -466,6 +481,7 @@ function render() {
   }[state.tab]();
   $(`#list-${state.tab}`).replaceChildren(...cards.slice(0, LIST_LIMIT));
   setStatus(state.tab, statusText(state.tab, cards.length));
+  if (state.tab === 'maps') renderGeoreferenceList();
 }
 
 function filteredViews(bounds: LngLatBounds | null) {
@@ -565,7 +581,7 @@ function mapCard({ m, index }: { m: HistoricMap; index: number }) {
       onmouseenter: () => setHover(key),
       onmouseleave: () => setHover(null),
     },
-    el('img', { src: commonsThumb(m.file, 120), alt: '', loading: 'lazy', onclick: () => toggleOverlay(m) }),
+    el('img', { src: m.thumb, alt: '', loading: 'lazy', onclick: () => toggleOverlay(m) }),
     el(
       'div',
       { class: 'card-body' },
@@ -585,7 +601,7 @@ function mapCard({ m, index }: { m: HistoricMap; index: number }) {
             'aria-label': 'Overlay opacity',
             oninput: (e: Event) => setOverlayOpacity(m, Number((e.target as HTMLInputElement).value)),
           }),
-        el('a', { href: m.commons, target: '_blank', rel: 'noopener' }, 'Commons'),
+        el('a', { href: m.link.href, target: '_blank', rel: 'noopener' }, m.link.label),
       ),
     ),
   );
@@ -700,6 +716,52 @@ function openLightbox(file: string, caption: string) {
   $('#lightbox').hidden = false;
 }
 
+// ---------------------------------------------------------------------------------------------- georeference
+
+let mapCandidatesRequested = false;
+
+function loadMapCandidatesOnce() {
+  if (mapCandidatesRequested || !city.mapCategories.length) return;
+  mapCandidatesRequested = true;
+  loadGeoreferenceCandidates(city)
+    .then((candidates) => {
+      state.mapCandidates = candidates;
+      state.mapCandidatesLoaded = true;
+    })
+    .catch((error) => ($('#status-georef').textContent = `Could not search Commons: ${error.message}`))
+    .finally(scheduleRender);
+}
+
+/** Old Commons maps not yet on Wikimaps Warper, listed under the georeferenced ones. */
+function renderGeoreferenceList() {
+  if (!state.mapCandidatesLoaded) return;
+  const candidates = state.mapCandidates.filter((c) => matchesQuery(c.title, c.creator));
+  $('#list-georef').replaceChildren(...candidates.slice(0, LIST_LIMIT).map(georeferenceCard));
+  $('#status-georef').textContent = candidates.length
+    ? `${candidates.length} map${candidates.length === 1 ? '' : 's'} on Commons waiting to be georeferenced`
+    : 'Every map in these Commons categories is already on Wikimaps Warper.';
+}
+
+function georeferenceCard(c: CommonsFile) {
+  return el(
+    'li',
+    { class: 'card map-card' },
+    el('img', { src: commonsThumb(c.file, 120), alt: '', loading: 'lazy', onclick: () => openLightbox(c.file, c.title) }),
+    el(
+      'div',
+      { class: 'card-body' },
+      el('div', { class: 'card-title' }, c.title),
+      el('div', { class: 'card-meta' }, c.year ?? 'Undated'),
+      el(
+        'div',
+        { class: 'card-actions' },
+        el('a', { class: 'btn small', href: warperImportUrl(c), target: '_blank', rel: 'noopener' }, 'Georeference on Warper'),
+        link(commonsPage(c.file), 'Commons'),
+      ),
+    ),
+  );
+}
+
 // ---------------------------------------------------------------------------------------------- locate
 
 let candidatesRequested = false;
@@ -720,7 +782,7 @@ function filteredCandidates() {
   return state.candidates.filter((c) => matchesQuery(c.title, c.creator));
 }
 
-function candidateCard(c: LocateCandidate) {
+function candidateCard(c: CommonsFile) {
   return el(
     'li',
     { class: 'card', onclick: () => startLocating(c) },
@@ -735,7 +797,7 @@ function candidateCard(c: LocateCandidate) {
 }
 
 /** Lets a contributor place a photograph's camera on the map and copy the {{Location}} template for Commons. */
-function startLocating(c: LocateCandidate) {
+function startLocating(c: CommonsFile) {
   setSelection(null);
   if (c.year != null) setYear(c.year);
 

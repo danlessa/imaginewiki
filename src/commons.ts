@@ -2,8 +2,8 @@ import { cached, HOUR } from './cache.ts';
 import type { City } from './config.ts';
 import type { View } from './wikidata.ts';
 
-/** An old photograph on Commons with no location yet, offered in the Locate tab. */
-export interface LocateCandidate {
+/** A Commons file offered to contributors, to locate (photographs) or georeference (maps). */
+export interface CommonsFile {
   /** Commons MediaInfo id (M…). */
   id: string;
   title: string;
@@ -24,8 +24,10 @@ const YEAR = /\b(1[5-9]\d\d|20[0-2]\d)s?\b/;
 /** Search filters for bitmaps with neither a camera nor an object location, as a template or structured data. */
 const UNLOCATED =
   'filetype:bitmap -hastemplate:Location -hastemplate:"Object location" -haswbstatement:P1259 -haswbstatement:P9149';
+/** Search filter for maps that aren't georeferenced yet; Commons tags warped maps with this category. */
+const NOT_GEOREFERENCED = 'filetype:bitmap -incategory:"Georeferenced_maps_in_Wikimaps_Warper"';
 const SEARCH_BATCH = 50;
-const CANDIDATES_PER_CATEGORY = 200;
+const FILES_PER_CATEGORY = 200;
 const EDIT_SUMMARY = 'Camera location and heading from imagineWiki #imagineWiki';
 
 export const commonsThumb = (file: string, width: number) => `${FILE_PATH}${encodeURIComponent(file)}?width=${width}`;
@@ -36,6 +38,9 @@ export const commonsPage = (file: string) =>
 /** The file's edit page on Commons, with the edit summary filled in. */
 export const commonsEditUrl = (file: string) =>
   `https://commons.wikimedia.org/w/index.php?${new URLSearchParams({ title: `File:${file}`, action: 'edit', summary: EDIT_SUMMARY })}`;
+
+/** Wikimaps Warper's import page for a Commons map, where contributors georeference it. */
+export const warperImportUrl = (file: CommonsFile) => `https://warper.wmflabs.org/wikimaps/new?pageid=${file.id.slice(1)}`;
 
 /** The {{Location}} template for a camera position, which Commons uses to geocode the file. */
 export function locationTemplate({ lat, lon, heading }: { lat: number; lon: number; heading: number }) {
@@ -94,21 +99,26 @@ export async function loadCommonsViews(city: City): Promise<View[]> {
   }
 }
 
+// Candidate lists are cached briefly, so files contributors just finished drop off soon.
+
 /** Photographs in the city's Commons categories that have no location, oldest first. */
 export const loadLocateCandidates = (city: City) =>
-  // Short-lived, so photographs that were just located drop off the list soon.
-  cached(`candidates:${city.id}`, HOUR, async () => {
-    const found = new Map<string, LocateCandidate>();
-    for (const category of city.photoCategories) {
-      for (const candidate of await searchUnlocated(category)) found.set(candidate.id, candidate);
-    }
-    return [...found.values()].sort(
-      (a, b) => (a.year ?? Infinity) - (b.year ?? Infinity) || a.title.localeCompare(b.title),
-    );
-  });
+  cached(`candidates:${city.id}`, HOUR, () => searchCategories(city.photoCategories, UNLOCATED));
 
-async function searchUnlocated(category: string): Promise<LocateCandidate[]> {
-  const candidates: LocateCandidate[] = [];
+/** Maps in the city's Commons categories that aren't on Wikimaps Warper yet, oldest first. */
+export const loadGeoreferenceCandidates = (city: City) =>
+  cached(`map-candidates:${city.id}`, HOUR, () => searchCategories(city.mapCategories, NOT_GEOREFERENCED));
+
+async function searchCategories(categories: string[], filters: string): Promise<CommonsFile[]> {
+  const found = new Map<string, CommonsFile>();
+  for (const category of categories) {
+    for (const file of await searchFiles(`incategory:"${category}" ${filters}`)) found.set(file.id, file);
+  }
+  return [...found.values()].sort((a, b) => (a.year ?? Infinity) - (b.year ?? Infinity) || a.title.localeCompare(b.title));
+}
+
+async function searchFiles(query: string): Promise<CommonsFile[]> {
+  const files: CommonsFile[] = [];
   let offset: number | undefined;
   do {
     const params = new URLSearchParams({
@@ -119,7 +129,7 @@ async function searchUnlocated(category: string): Promise<LocateCandidate[]> {
       generator: 'search',
       gsrnamespace: '6',
       gsrlimit: String(SEARCH_BATCH),
-      gsrsearch: `incategory:"${category}" ${UNLOCATED}`,
+      gsrsearch: query,
       prop: 'imageinfo',
       iiprop: 'extmetadata',
       iiextmetadatafilter: 'DateTimeOriginal|ObjectName|Artist',
@@ -132,15 +142,16 @@ async function searchUnlocated(category: string): Promise<LocateCandidate[]> {
     for (const page of json.query?.pages ?? []) {
       const meta = page.imageinfo?.[0]?.extmetadata ?? {};
       const file = page.title.replace(/^File:/, '');
-      candidates.push({
+      files.push({
         id: `M${page.pageid}`,
         title: plainText(meta.ObjectName?.value) ?? file.replace(/\.[a-z0-9]+$/i, ''),
         file,
-        year: meta.DateTimeOriginal ? commonsDateYear(meta.DateTimeOriginal.value) : null,
+        // Old maps are often dated only in the file name, e.g. "Planta da Cidade de S. Paulo (1810)".
+        year: (meta.DateTimeOriginal ? commonsDateYear(meta.DateTimeOriginal.value) : null) ?? yearIn(file),
         creator: plainText(meta.Artist?.value),
       });
     }
     offset = json.continue?.gsroffset;
-  } while (offset && candidates.length < CANDIDATES_PER_CATEGORY);
-  return candidates;
+  } while (offset && files.length < FILES_PER_CATEGORY);
+  return files;
 }

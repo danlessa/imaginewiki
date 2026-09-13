@@ -1,5 +1,5 @@
 import type { Feature, FeatureCollection, Geometry, Position } from 'geojson';
-import type { HistoricMap } from './warper.ts';
+import type { HistoricMap } from './config.ts';
 import type { Landmark, View } from './wikidata.ts';
 
 /** Year given to undated features so year-range filters exclude them. */
