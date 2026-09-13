@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>imagineWiki</title>
+    <meta
+      name="description"
+      content="A historical atlas of Brazilian cities built on Wikidata, Wikimedia Commons, Wikimaps Warper and OpenHistoricalMap."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 2c-5.5 0-10 4.3-10 9.7C6 19 16 30 16 30s10-11 10-18.3C26 6.3 21.5 2 16 2z' fill='%23c8553d'/><circle cx='16' cy='12' r='4' fill='white'/></svg>"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600&display=swap" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <button id="sidebar-toggle" class="icon-btn" aria-label="Toggle sidebar">☰</button>
+        <a class="brand" href="./">imagine<span>Wiki</span></a>
+        <select id="city" class="city-select" aria-label="City"></select>
+        <p id="subtitle" class="subtitle"></p>
+        <button id="about-btn" class="text-btn">About</button>
+      </header>
+
+      <aside id="sidebar" class="sidebar">
+        <section id="browse">
+          <div class="search">
+            <input id="search" type="search" placeholder="Search photographs, maps and landmarks" autocomplete="off" />
+          </div>
+          <div class="filters">
+            <label><input id="in-view" type="checkbox" checked /> Only what's in the map area</label>
+          </div>
+          <nav class="tabs" role="tablist">
+            <button role="tab" data-tab="views" class="active">Views <span class="count" id="count-views"></span></button>
+            <button role="tab" data-tab="maps">Maps &amp; Plans <span class="count" id="count-maps"></span></button>
+            <button role="tab" data-tab="landmarks">Landmarks <span class="count" id="count-landmarks"></span></button>
+          </nav>
+
+          <div class="panel" id="panel-views">
+            <div class="filters panel-filters">
+              <label>
+                Photographs taken within
+                <select id="window">
+                  <option value="0">the same year</option>
+                  <option value="5" selected>±5 years</option>
+                  <option value="10">±10 years</option>
+                  <option value="25">±25 years</option>
+                  <option value="-1">any year</option>
+                </select>
+              </label>
+            </div>
+            <p class="status" id="status-views">Loading photographs from Wikidata and Commons…</p>
+            <ul class="cards" id="list-views"></ul>
+          </div>
+
+          <div class="panel" id="panel-maps" hidden>
+            <p class="status" id="status-maps">Loading georeferenced maps from Wikimaps Warper…</p>
+            <ul class="cards" id="list-maps"></ul>
+          </div>
+
+          <div class="panel" id="panel-landmarks" hidden>
+            <p class="status" id="status-landmarks">Loading landmarks from Wikidata…</p>
+            <ul class="cards" id="list-landmarks"></ul>
+          </div>
+        </section>
+
+        <section id="detail" hidden>
+          <button id="detail-back" class="text-btn back">← Back to list</button>
+          <div id="detail-content"></div>
+        </section>
+      </aside>
+
+      <main id="map"></main>
+
+      <footer class="timeline">
+        <button id="play" class="icon-btn play" aria-label="Play through the years">▶</button>
+        <div class="year-picker">
+          <button id="year-dec" class="icon-btn" aria-label="Previous year">‹</button>
+          <input id="year-input" type="number" aria-label="Year" />
+          <button id="year-inc" class="icon-btn" aria-label="Next year">›</button>
+        </div>
+        <div class="track">
+          <div id="histogram" class="histogram" aria-hidden="true"></div>
+          <div id="window-band" class="window-band" aria-hidden="true"></div>
+          <div id="map-markers" class="map-markers"></div>
+          <input id="year-range" type="range" step="1" aria-label="Year" />
+          <div id="ticks" class="ticks" aria-hidden="true"></div>
+        </div>
+      </footer>
+    </div>
+
+    <div id="lightbox" class="lightbox" hidden>
+      <button class="icon-btn lightbox-close" aria-label="Close">✕</button>
+      <figure>
+        <img id="lightbox-img" alt="" />
+        <figcaption id="lightbox-caption"></figcaption>
+      </figure>
+    </div>
+
+    <dialog id="about">
+      <form method="dialog">
+        <h2>About imagineWiki</h2>
+        <p>
+          imagineWiki is an open take on the
+          <a href="https://imaginerio.org/en/map" target="_blank" rel="noopener">imagineRio</a> atlas. Everything on the
+          map comes from open, community-maintained projects:
+        </p>
+        <ul>
+          <li>
+            <strong><a href="https://www.openhistoricalmap.org/" target="_blank" rel="noopener">OpenHistoricalMap</a></strong>:
+            streets, buildings, rail lines and coastlines, filtered to the selected year.
+          </li>
+          <li>
+            <strong><a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a></strong> and
+            <strong><a href="https://commons.wikimedia.org/" target="_blank" rel="noopener">Wikimedia Commons</a></strong>:
+            historical photographs with a camera position, from Wikidata items (such as the Instituto Moreira
+            Salles collection for Rio) and geotagged Commons files, and dated landmarks.
+          </li>
+          <li>
+            <strong><a href="https://warper.wmflabs.org/" target="_blank" rel="noopener">Wikimaps Warper</a></strong>:
+            historical maps from Commons, georeferenced by volunteers.
+          </li>
+        </ul>
+        <p>
+          Something missing or wrong? Every source can be edited: add dates to features on OpenHistoricalMap, camera
+          headings on Wikidata, or georeference another map on Warper.
+        </p>
+        <p class="muted">
+          Inspired by imagineRio (Rice University and Axis Maps). This project is not affiliated with them.
+        </p>
+        <button class="btn">Close</button>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

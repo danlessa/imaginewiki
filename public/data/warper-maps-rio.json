@@ -1,0 +1,156 @@
+[
+  {
+    "id": "3530",
+    "title": "L'entrée de l'escadre de Duguay-Trouin à Rio en 1711",
+    "year": 1711,
+    "bbox": [
+      -43.227643,
+      -23.031697,
+      -43.0681062,
+      -22.7704391
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3530/{z}/{x}/{y}.png",
+    "file": "L'entrée de l'escadre de Duguay-Trouin à Rio en 1711.jpg",
+    "commons": "https://commons.wikimedia.org/wiki/File:L%27entr%C3%A9e_de_l%27escadre_de_Duguay-Trouin_%C3%A0_Rio_en_1711.jpg"
+  },
+  {
+    "id": "3454",
+    "title": "Passeio1862-JoaqManMacedo-Um Passeio pela cidade do RJ",
+    "year": 1862,
+    "bbox": [
+      -43.1777876,
+      -22.9149262,
+      -43.1752248,
+      -22.9121873
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3454/{z}/{x}/{y}.png",
+    "file": "Passeio1862-JoaqManMacedo-Um Passeio pela cidade do RJ.jpg",
+    "commons": "https://commons.wikimedia.org/wiki/File:Passeio1862-JoaqManMacedo-Um_Passeio_pela_cidade_do_RJ.jpg"
+  },
+  {
+    "id": "3529",
+    "title": "Mapa IIFA de Glasl",
+    "year": 1863,
+    "bbox": [
+      -43.2362738,
+      -22.9769291,
+      -43.2148737,
+      -22.9592014
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3529/{z}/{x}/{y}.png",
+    "file": "Mapa IIFA de Glasl.jpg",
+    "commons": "https://commons.wikimedia.org/wiki/File:Mapa_IIFA_de_Glasl.jpg"
+  },
+  {
+    "id": "3457",
+    "title": "Rio de Janeiro city - Commercial Distric. LOC 2012593123",
+    "year": 1900,
+    "bbox": [
+      -43.2016037,
+      -22.9360668,
+      -43.1477467,
+      -22.8857347
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3457/{z}/{x}/{y}.png",
+    "file": "Rio de Janeiro city - Commercial Distric. LOC 2012593123.tif",
+    "commons": "https://commons.wikimedia.org/wiki/File:Rio_de_Janeiro_city_-_Commercial_Distric._LOC_2012593123.tif"
+  },
+  {
+    "id": "3455",
+    "title": "Distrito Federal, c.1903",
+    "year": 1903,
+    "bbox": [
+      -43.7628747,
+      -23.1387825,
+      -42.9709737,
+      -22.7777866
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3455/{z}/{x}/{y}.png",
+    "file": "Distrito Federal, c.1903.jpg",
+    "commons": "https://commons.wikimedia.org/wiki/File:Distrito_Federal,_c.1903.jpg"
+  },
+  {
+    "id": "3456",
+    "title": "Rio de Janeiro Tramway Map 1906",
+    "year": 1906,
+    "bbox": [
+      -43.2966044,
+      -23.0121733,
+      -43.1273832,
+      -22.8547017
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3456/{z}/{x}/{y}.png",
+    "file": "Rio de Janeiro Tramway Map 1906.jpeg",
+    "commons": "https://commons.wikimedia.org/wiki/File:Rio_de_Janeiro_Tramway_Map_1906.jpeg"
+  },
+  {
+    "id": "3515",
+    "title": "Mapa da Cidade do Rio de Janeiro (1931)",
+    "year": 1931,
+    "bbox": [
+      -43.2194982,
+      -22.9508264,
+      -43.1552891,
+      -22.8865052
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3515/{z}/{x}/{y}.png",
+    "file": "Mapa da Cidade do Rio de Janeiro (1931).tif",
+    "commons": "https://commons.wikimedia.org/wiki/File:Mapa_da_Cidade_do_Rio_de_Janeiro_(1931).tif"
+  },
+  {
+    "id": "1772",
+    "title": "NovasViasCariocas-TransOeste, TransCarioca e TransOlímpica",
+    "year": 2012,
+    "bbox": [
+      -43.7733594076275,
+      -23.098152371400023,
+      -43.13864817736585,
+      -22.744319099357607
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/1772/{z}/{x}/{y}.png",
+    "file": "NovasViasCariocas-TransOeste, TransCarioca e TransOlímpica.jpg",
+    "commons": "https://commons.wikimedia.org/wiki/File:NovasViasCariocas-TransOeste,_TransCarioca_e_TransOl%C3%ADmpica.jpg"
+  },
+  {
+    "id": "3469",
+    "title": "Diagrama metro rio",
+    "year": 2019,
+    "bbox": [
+      -43.4041098,
+      -23.0419107,
+      -43.1486557,
+      -22.7585154
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3469/{z}/{x}/{y}.png",
+    "file": "Diagrama metro rio.png",
+    "commons": "https://commons.wikimedia.org/wiki/File:Diagrama_metro_rio.png"
+  },
+  {
+    "id": "3589",
+    "title": "Mapa do Bosque da Barra",
+    "year": null,
+    "bbox": [
+      -43.3917061,
+      -23.0107168,
+      -43.355621,
+      -22.9829086
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3589/{z}/{x}/{y}.png",
+    "file": "Mapa do Bosque da Barra.jpg",
+    "commons": "https://commons.wikimedia.org/wiki/File:Mapa_do_Bosque_da_Barra.jpg"
+  },
+  {
+    "id": "3531",
+    "title": "Plan de la baye, ville, forteresses, et attaques de Rio Janeiro",
+    "year": null,
+    "bbox": [
+      -43.2321171,
+      -22.9959201,
+      -43.074209,
+      -22.7743979
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/3531/{z}/{x}/{y}.png",
+    "file": "Plan de la baye, ville, forteresses, et attaques de Rio Janeiro.jpg",
+    "commons": "https://commons.wikimedia.org/wiki/File:Plan_de_la_baye,_ville,_forteresses,_et_attaques_de_Rio_Janeiro.jpg"
+  }
+]

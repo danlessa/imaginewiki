@@ -1,0 +1,23 @@
+{
+  "name": "imaginewiki",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "snapshot:maps": "node scripts/snapshot-warper.ts",
+    "snapshot:commons": "node scripts/snapshot-commons.ts"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@openhistoricalmap/maplibre-gl-dates": "^1.4.0",
+    "maplibre-gl": "^6.9.0"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}
