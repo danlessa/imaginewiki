@@ -14,10 +14,19 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import type { FeatureCollection } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
-import { commonsPage, commonsThumb, loadCommonsViews } from './commons.ts';
+import {
+  commonsEditUrl,
+  commonsPage,
+  commonsThumb,
+  loadCommonsViews,
+  loadLocateCandidates,
+  locationTemplate,
+  type LocateCandidate,
+} from './commons.ts';
 import { CITIES, DEFAULT_CITY, DEFAULT_YEAR, MAX_YEAR, MIN_YEAR, OHM_STYLE } from './config.ts';
 import { $, el } from './dom.ts';
 import { landmarkPoints, mapFootprints, viewCones, viewPoints } from './geo.ts';
+import { PlacementTool, type Placement } from './locate.ts';
 import { applyDateFilter, softenBasemap, styleFont } from './ohm.ts';
 import { loadHistoricMaps, type HistoricMap } from './warper.ts';
 import { loadLandmarks, loadViews, type Landmark, type View } from './wikidata.ts';
@@ -26,10 +35,10 @@ import { loadLandmarks, loadViews, type Landmark, type View } from './wikidata.t
 // so let Vite bundle the worker and hand MapLibre the resulting URL.
 setWorkerUrl(maplibreWorkerUrl);
 
-type Tab = 'views' | 'maps' | 'landmarks';
+type Tab = 'views' | 'maps' | 'landmarks' | 'locate';
 type Selection = { kind: 'view' | 'landmark'; index: number };
 
-const TABS: Tab[] = ['views', 'maps', 'landmarks'];
+const TABS: Tab[] = ['views', 'maps', 'landmarks', 'locate'];
 const LIST_LIMIT = 150;
 const NEAR_YEARS = 25;
 const OVERLAY_OPACITY = 0.85;
@@ -60,7 +69,8 @@ const state = {
   views: [] as View[],
   landmarks: [] as Landmark[],
   maps: [] as HistoricMap[],
-  loaded: { views: false, maps: false, landmarks: false } as Record<Tab, boolean>,
+  candidates: [] as LocateCandidate[],
+  loaded: { views: false, maps: false, landmarks: false, locate: false } as Record<Tab, boolean>,
   overlays: new Map<string, number>(),
   selected: null as Selection | null,
   hovered: null as string | null,
@@ -79,6 +89,7 @@ map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
 map.addControl(new AttributionControl({ compact: true, customAttribution: ATTRIBUTION }), 'bottom-right');
 
 const hoverPopup = new Popup({ closeButton: false, closeOnClick: false, offset: 12, maxWidth: '240px' });
+const placement = new PlacementTool(map);
 
 map.on('load', () => {
   softenBasemap(map);
@@ -419,6 +430,7 @@ function setupSidebar() {
 
 function selectTab(tab: Tab) {
   state.tab = tab;
+  if (tab === 'locate') loadCandidatesOnce();
   for (const button of document.querySelectorAll<HTMLButtonElement>('.tabs button')) {
     button.classList.toggle('active', button.dataset.tab === tab);
   }
@@ -439,21 +451,21 @@ function render() {
     views: filteredViews(bounds),
     maps: filteredMaps(bounds),
     landmarks: filteredLandmarks(bounds),
+    locate: filteredCandidates(),
   };
   for (const tab of TABS) {
     $(`#count-${tab}`).textContent = state.loaded[tab] ? String(lists[tab].length) : '';
   }
   if (!state.loaded[state.tab]) return;
 
-  const cards =
-    state.tab === 'views'
-      ? lists.views.map(viewCard)
-      : state.tab === 'maps'
-        ? lists.maps.map(mapCard)
-        : lists.landmarks.map(landmarkCard);
-  const noun = { views: 'photograph', maps: 'map', landmarks: 'landmark' }[state.tab];
+  const cards = {
+    views: () => lists.views.map(viewCard),
+    maps: () => lists.maps.map(mapCard),
+    landmarks: () => lists.landmarks.map(landmarkCard),
+    locate: () => lists.locate.map(candidateCard),
+  }[state.tab]();
   $(`#list-${state.tab}`).replaceChildren(...cards.slice(0, LIST_LIMIT));
-  setStatus(state.tab, statusText(cards.length, noun));
+  setStatus(state.tab, statusText(state.tab, cards.length));
 }
 
 function filteredViews(bounds: LngLatBounds | null) {
@@ -504,10 +516,21 @@ function setStatus(tab: Tab, text: string) {
   $(`#status-${tab}`).textContent = text;
 }
 
-function statusText(count: number, noun: string) {
-  if (count === 0) return `No ${noun}s for ${state.year} here. Try zooming out or widening the time range.`;
-  if (count > LIST_LIMIT) return `Showing ${LIST_LIMIT} of ${count} ${noun}s`;
-  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+const NOUNS: Record<Tab, [string, string]> = {
+  views: ['photograph', 'photographs'],
+  maps: ['map', 'maps'],
+  landmarks: ['landmark', 'landmarks'],
+  locate: ['photograph to locate', 'photographs to locate'],
+};
+
+function statusText(tab: Tab, count: number) {
+  const [singular, plural] = NOUNS[tab];
+  if (count === 0 && tab === 'locate') {
+    return state.query ? 'No photographs to locate match your search.' : 'Every photograph in these collections has a location.';
+  }
+  if (count === 0) return `No ${plural} for ${state.year} here. Try zooming out or widening the time range.`;
+  if (count > LIST_LIMIT) return `Showing ${LIST_LIMIT} of ${count} ${plural}`;
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 function viewCard({ view: v, index }: { view: View; index: number }) {
@@ -668,6 +691,7 @@ function closeDetail() {
   $('#detail').hidden = true;
   $('#browse').hidden = false;
   setSelection(null);
+  placement.stop();
 }
 
 function openLightbox(file: string, caption: string) {
@@ -676,12 +700,113 @@ function openLightbox(file: string, caption: string) {
   $('#lightbox').hidden = false;
 }
 
+// ---------------------------------------------------------------------------------------------- locate
+
+let candidatesRequested = false;
+
+function loadCandidatesOnce() {
+  if (candidatesRequested) return;
+  candidatesRequested = true;
+  loadLocateCandidates(city)
+    .then((candidates) => {
+      state.candidates = candidates;
+      state.loaded.locate = true;
+    })
+    .catch((error) => setStatus('locate', `Could not search Commons: ${error.message}`))
+    .finally(scheduleRender);
+}
+
+function filteredCandidates() {
+  return state.candidates.filter((c) => matchesQuery(c.title, c.creator));
+}
+
+function candidateCard(c: LocateCandidate) {
+  return el(
+    'li',
+    { class: 'card', onclick: () => startLocating(c) },
+    el('img', { src: commonsThumb(c.file, 120), alt: '', loading: 'lazy' }),
+    el(
+      'div',
+      { class: 'card-body' },
+      el('div', { class: 'card-title' }, c.title),
+      el('div', { class: 'card-meta' }, [c.year ?? 'Undated', c.creator].filter(Boolean).join(' · ')),
+    ),
+  );
+}
+
+/** Lets a contributor place a photograph's camera on the map and copy the {{Location}} template for Commons. */
+function startLocating(c: LocateCandidate) {
+  setSelection(null);
+  if (c.year != null) setYear(c.year);
+
+  const template = el('textarea', { class: 'template', readonly: true, rows: 2, 'aria-label': 'Location template' });
+  template.placeholder = 'Click the map to place the camera';
+  const heading = el('input', { type: 'range', min: 0, max: 359, step: 1, value: 0, disabled: true, 'aria-label': 'Camera heading' });
+  const headingValue = el('output', {}, '–');
+  // Copying stays disabled until the camera is placed, so an unplaced default can't be pasted into Commons.
+  const copy = el('button', { class: 'btn', disabled: true }, 'Copy template');
+
+  heading.addEventListener('input', () => placement.setHeading(Number(heading.value)));
+  copy.addEventListener('click', () => {
+    template.select();
+    navigator.clipboard.writeText(template.value).then(
+      () => (copy.textContent = 'Copied'),
+      () => (copy.textContent = 'Press Ctrl+C to copy'),
+    );
+  });
+
+  showDetail(
+    el(
+      'article',
+      { class: 'detail-body locate' },
+      el(
+        'button',
+        { class: 'detail-image', onclick: () => openLightbox(c.file, c.title), 'aria-label': 'Enlarge photograph' },
+        el('img', { src: commonsThumb(c.file, 640), alt: c.title }),
+      ),
+      el('h2', {}, c.title),
+      el('dl', { class: 'facts' }, fact('Date', c.year ?? 'Undated'), fact('Photographer', c.creator)),
+      el(
+        'ol',
+        { class: 'steps' },
+        el('li', {}, 'Click the map where the photographer stood. Drag the dot to adjust it.'),
+        el('li', {}, 'Drag the square handle, or use the slider, to point the cone where the camera faced.'),
+        el(
+          'li',
+          {},
+          'Copy the template, open the edit page on Commons, paste it on its own line right below the {{Information}} block and publish.',
+        ),
+      ),
+      el('label', { class: 'heading-row' }, 'Heading', heading, headingValue),
+      template,
+      el(
+        'div',
+        { class: 'card-actions' },
+        copy,
+        el('a', { class: 'btn', href: commonsEditUrl(c.file), target: '_blank', rel: 'noopener' }, 'Edit on Commons'),
+        link(commonsPage(c.file), 'View file'),
+      ),
+      el('p', { class: 'muted' }, 'Once saved on Commons, the photograph shows up on this map after the next Commons snapshot.'),
+    ),
+  );
+
+  placement.start((p: Placement) => {
+    template.value = locationTemplate(p);
+    heading.disabled = false;
+    heading.value = String(Math.round(p.heading));
+    headingValue.textContent = `${Math.round(p.heading)}°`;
+    copy.disabled = false;
+    copy.textContent = 'Copy template';
+  });
+}
+
 // ---------------------------------------------------------------------------------------------- map interaction
 
 const INTERACTIVE_LAYERS = ['landmarks', 'views-points', 'views-cones'];
 
 function setupMapInteraction() {
   map.on('click', (e) => {
+    if (placement.active) return;
     const feature = featureAt(e.point);
     if (!feature) return;
     if (feature.layer.id === 'landmarks') selectLandmark(Number(feature.id), false);
@@ -689,6 +814,7 @@ function setupMapInteraction() {
   });
 
   map.on('mousemove', (e) => {
+    if (placement.active) return;
     const feature = featureAt(e.point);
     map.getCanvas().style.cursor = feature ? 'pointer' : '';
     if (!feature) return setHover(null);

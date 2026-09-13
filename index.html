@@ -38,6 +38,7 @@
             <button role="tab" data-tab="views" class="active">Views <span class="count" id="count-views"></span></button>
             <button role="tab" data-tab="maps">Maps &amp; Plans <span class="count" id="count-maps"></span></button>
             <button role="tab" data-tab="landmarks">Landmarks <span class="count" id="count-landmarks"></span></button>
+            <button role="tab" data-tab="locate">Locate <span class="count" id="count-locate"></span></button>
           </nav>
 
           <div class="panel" id="panel-views">
@@ -65,6 +66,15 @@
           <div class="panel" id="panel-landmarks" hidden>
             <p class="status" id="status-landmarks">Loading landmarks from Wikidata…</p>
             <ul class="cards" id="list-landmarks"></ul>
+          </div>
+
+          <div class="panel" id="panel-locate" hidden>
+            <p class="panel-intro">
+              Old photographs on Wikimedia Commons that don't have a location yet. Place one on the map and add its
+              location to Commons, where everyone can use it.
+            </p>
+            <p class="status" id="status-locate">Searching Commons for photographs without a location…</p>
+            <ul class="cards" id="list-locate"></ul>
           </div>
         </section>
 

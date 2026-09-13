@@ -26,7 +26,11 @@ The build is a static site with relative paths, so `dist/` can be served from an
 
 ## Cities
 
-Cities are defined in `src/config.ts` (centre, zoom and bounding box), and the first entry is the default. Switch with the selector in the top bar or the `city` URL parameter, e.g. `#city=rio`. Run `npm run snapshot:maps` and `npm run snapshot:commons` after adding a city.
+Cities are defined in `src/config.ts` (centre, zoom, bounding box and the Commons photo categories offered in the Locate tab), and the first entry is the default. Switch with the selector in the top bar or the `city` URL parameter, e.g. `#city=rio`. Run `npm run snapshot:maps` and `npm run snapshot:commons` after adding a city.
+
+## Locating photographs
+
+The Locate tab lists photographs from each city's Commons categories that have no camera or object location, neither as a template nor as structured data. A contributor places the camera and its heading on the map, copies the generated `{{Location|lat|lon|heading:…}}` template and pastes it into the file page on Commons. The location is saved on Commons, where every project can use it; imagineWiki stores nothing.
 
 ## Improving the map
 

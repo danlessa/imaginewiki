@@ -9,6 +9,8 @@ export interface City {
   zoom: number;
   /** West, south, east, north. Photographs, landmarks and maps are limited to this box. */
   bbox: [number, number, number, number];
+  /** Commons categories of old photographs of the city, offered in the Locate tab when they lack a location. */
+  photoCategories: string[];
 }
 
 /** The first city is the default. */
@@ -19,6 +21,11 @@ export const CITIES: City[] = [
     center: [-46.634, -23.548],
     zoom: 14,
     bbox: [-46.85, -24.01, -46.36, -23.35],
+    photoCategories: [
+      'Photographs of São Paulo by Guilherme Gaensly',
+      'Álbum Comparativo da Cidade de S. Paulo 1862-1887',
+      'Photographs by Aurélio Becherini in the Museu da Cidade de São Paulo',
+    ],
   },
   {
     id: 'rio',
@@ -27,6 +34,7 @@ export const CITIES: City[] = [
     zoom: 14,
     // Covers the city plus the bay, so whole-city maps fit inside it.
     bbox: [-43.85, -23.2, -42.9, -22.6],
+    photoCategories: ['Photographs by Augusto Malta', 'Photographs by Marc Ferrez'],
   },
 ];
 

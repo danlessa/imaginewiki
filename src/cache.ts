@@ -1,6 +1,7 @@
 const PREFIX = 'imaginewiki:v1:';
 
-export const DAY = 24 * 60 * 60 * 1000;
+export const HOUR = 60 * 60 * 1000;
+export const DAY = 24 * HOUR;
 
 /** Memoizes an async loader in localStorage. Storage failures fall back to loading every time. */
 export async function cached<T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> {

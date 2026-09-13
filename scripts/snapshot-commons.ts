@@ -4,7 +4,7 @@
 // box. That takes hundreds of API requests, which is why it runs ahead of time instead of in the browser.
 // Run with `npm run snapshot:commons`, optionally followed by city ids to refresh only those.
 import { mkdir, writeFile } from 'node:fs/promises';
-import { commonsDateYear } from '../src/commons.ts';
+import { commonsDateYear, plainText } from '../src/commons.ts';
 import { CITIES, type City } from '../src/config.ts';
 import { fetchViews, type View } from '../src/wikidata.ts';
 
@@ -213,30 +213,6 @@ function split([s, w, n, e]: Tile): Tile[] {
     [midLat, w, n, midLon],
     [midLat, midLon, n, e],
   ];
-}
-
-/** Text content of a Commons metadata value, which may contain HTML. */
-function plainText(html: string | undefined): string | null {
-  if (!html) return null;
-  const text = html
-    .replace(/<[^>]*>/g, ' ')
-    // Drop the hidden QuickStatements payloads that {{Artwork}} and {{Other date}} render after the visible text.
-    .split(/\b(?:label|date) QS:/)[0]
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/\s+/g, ' ')
-    .trim();
-  // Some templates render a name twice, once visibly and once in a hidden span.
-  const words = text.split(' ');
-  const half = words.length / 2;
-  if (Number.isInteger(half) && words.slice(0, half).join(' ') === words.slice(half).join(' ')) {
-    return words.slice(0, half).join(' ') || null;
-  }
-  return text || null;
 }
 
 // Helpers below are function declarations so the top-level loop above can use them before this point.

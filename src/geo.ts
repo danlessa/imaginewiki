@@ -70,14 +70,14 @@ export function mapFootprints(maps: HistoricMap[]): Collection {
 }
 
 /** A field-of-view wedge in front of the camera, with the heading measured clockwise from north. */
-function cone(lon: number, lat: number, heading: number): Position[] {
+export function cone(lon: number, lat: number, heading: number, range = CONE_RANGE_METRES): Position[] {
   const metresPerDegreeLon = METRES_PER_DEGREE * Math.cos((lat * Math.PI) / 180);
   const ring: Position[] = [[lon, lat]];
   for (let step = 0; step <= CONE_STEPS; step++) {
     const angle = ((heading - CONE_FOV / 2 + (CONE_FOV * step) / CONE_STEPS) * Math.PI) / 180;
     ring.push([
-      lon + (CONE_RANGE_METRES * Math.sin(angle)) / metresPerDegreeLon,
-      lat + (CONE_RANGE_METRES * Math.cos(angle)) / METRES_PER_DEGREE,
+      lon + (range * Math.sin(angle)) / metresPerDegreeLon,
+      lat + (range * Math.cos(angle)) / METRES_PER_DEGREE,
     ]);
   }
   ring.push([lon, lat]);
