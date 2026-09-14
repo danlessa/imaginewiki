@@ -62,14 +62,17 @@ const PAULICEIA_ATTRIBUTION =
   '<a href="https://pauliceia.unifesp.br/" target="_blank">Pauliceia 2.0</a>, UNIFESP ' +
   '(<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank">CC BY-SA</a>)';
 
-/** A WMS GetMap URL in web mercator; MapLibre fills in the bounding box of each tile. */
+/**
+ * A WMS GetMap URL in web mercator; MapLibre fills in the bounding box of each tile. GeoServer downsamples with
+ * nearest neighbour unless asked, which makes zoomed-out scans look jagged, so it's asked for bilinear.
+ */
 function wmsTiles(wms: string, layer: string) {
-  return `${wms}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=${layer}&STYLES=&SRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=true`;
+  return `${wms}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=${layer}&STYLES=&SRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=true&INTERPOLATIONS=bilinear`;
 }
 
 /** A small WMS image of `bbox` for the map list. */
 function wmsThumb(wms: string, layer: string, [west, south, east, north]: HistoricMap['bbox']) {
-  return `${wms}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=${layer}&STYLES=&SRS=EPSG:4326&BBOX=${west},${south},${east},${north}&WIDTH=144&HEIGHT=144&FORMAT=image/jpeg`;
+  return `${wms}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=${layer}&STYLES=&SRS=EPSG:4326&BBOX=${west},${south},${east},${north}&WIDTH=144&HEIGHT=144&FORMAT=image/jpeg&INTERPOLATIONS=bilinear`;
 }
 
 function geosampaMap(layer: string, title: string, year: number): HistoricMap {
