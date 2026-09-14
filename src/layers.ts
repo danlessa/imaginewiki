@@ -43,6 +43,23 @@ interface BasemapLayer {
   opacity: [property: PaintProperty, value: unknown][];
 }
 
+/** imagineWiki's own layers for one kind of marker, shown as a single row in the panel. */
+export interface MarkerGroup {
+  id: string;
+  title: string;
+  /** Map layer ids that draw these markers. */
+  layers: string[];
+}
+
+interface Markers {
+  id: string;
+  title: string;
+  visible: boolean;
+  opacity: number;
+  /** Each map layer's opacity paint properties with the values imagineWiki gave them. */
+  layers: { id: string; opacity: [property: PaintProperty, value: unknown][] }[];
+}
+
 interface Saved {
   order: string[];
   visible: Record<string, boolean>;
@@ -67,6 +84,8 @@ export class LayerStack implements IControl {
   private readonly basemapLayers: BasemapLayer[];
   /** Top of the stack first. */
   private entries: Entry[];
+  /** Marker rows, always drawn above every map layer. */
+  private markers: Markers[] = [];
   private panel: HTMLElement | null = null;
   private toggle: HTMLButtonElement | null = null;
 
@@ -134,13 +153,40 @@ export class LayerStack implements IControl {
     this.update();
   }
 
+  /** Adds panel rows for imagineWiki's marker layers; call once those layers exist. */
+  addMarkers(groups: MarkerGroup[]) {
+    const saved = this.readSaved();
+    this.markers = groups.map((group) => ({
+      id: group.id,
+      title: group.title,
+      visible: saved?.visible?.[group.id] ?? true,
+      opacity: saved?.opacity?.[group.id] ?? 1,
+      layers: group.layers.flatMap((id) => {
+        const layer = this.map.getLayer(id);
+        if (!layer) return [];
+        const opacity = (OPACITY_PROPERTIES[layer.type] ?? []).map(
+          (property): [PaintProperty, unknown] => [property, this.map.getPaintProperty(id, property)],
+        );
+        return [{ id, opacity }];
+      }),
+    }));
+    this.render();
+  }
+
   /** Changes opacity without re-rendering, so a slider being dragged keeps working. */
   setOpacity(id: string, opacity: number) {
     const entry = this.entries.find((e) => e.id === id);
-    if (!entry) return;
-    entry.opacity = opacity;
-    if (entry.layer) this.paintRaster(entry);
-    else this.fadeBasemap(opacity);
+    const group = this.markers.find((m) => m.id === id);
+    if (entry) {
+      entry.opacity = opacity;
+      if (entry.layer) this.paintRaster(entry);
+      else this.fadeBasemap(opacity);
+    } else if (group) {
+      group.opacity = opacity;
+      this.fadeMarkers(group);
+    } else {
+      return;
+    }
     this.save();
     for (const control of this.panel?.querySelectorAll<HTMLElement>(`[data-layer="${CSS.escape(id)}"]`) ?? []) {
       const percent = Math.round(opacity * 100);
@@ -169,6 +215,7 @@ export class LayerStack implements IControl {
       this.map.setLayoutProperty(id, 'visibility', entry.visible ? 'visible' : 'none');
       this.paintRaster(entry);
     }
+    for (const group of this.markers) this.applyMarkers(group);
   }
 
   onAdd(): HTMLElement {
@@ -198,6 +245,11 @@ export class LayerStack implements IControl {
   }
 
   private setVisible(id: string, visible: boolean) {
+    const group = this.markers.find((m) => m.id === id);
+    if (group) {
+      group.visible = visible;
+      return this.update();
+    }
     const entry = this.entries.find((e) => e.id === id);
     if (!entry) return;
     if (!visible && entry.temporary) return this.hide(id);
@@ -274,73 +326,95 @@ export class LayerStack implements IControl {
     }
   }
 
+  private applyMarkers(group: Markers) {
+    for (const layer of group.layers) {
+      this.map.setLayoutProperty(layer.id, 'visibility', group.visible ? 'visible' : 'none');
+    }
+    this.fadeMarkers(group);
+  }
+
+  private fadeMarkers(group: Markers) {
+    for (const layer of group.layers) {
+      for (const [property, original] of layer.opacity) {
+        // imagineWiki's own opacity expressions only depend on hover and selection, not zoom, so they can be multiplied.
+        const faded = scaleOpacity(original, group.opacity) ?? ['*', group.opacity, original];
+        this.map.setPaintProperty(layer.id, property, faded as PaintValue);
+      }
+    }
+  }
+
   private render() {
     if (!this.panel) return;
     const last = this.entries.length - 1;
-    const rows = this.entries.map((entry, index) => {
-      const percent = Math.round(entry.opacity * 100);
-      const slider = el('input', {
-        type: 'range',
-        min: 0,
-        max: 100,
-        step: 5,
-        value: percent,
-        'data-layer': entry.id,
-        'aria-label': `${entry.title} opacity`,
-      });
-      slider.addEventListener('input', () => this.setOpacity(entry.id, Number(slider.value) / 100));
-      const moveButton = (delta: -1 | 1) =>
-        el(
-          'button',
-          {
-            type: 'button',
-            'data-move': delta < 0 ? 'up' : 'down',
-            'data-layer': entry.id,
-            title: delta < 0 ? 'Move up' : 'Move down',
-            'aria-label': `Move ${entry.title} ${delta < 0 ? 'up' : 'down'}`,
-            disabled: delta < 0 ? index === 0 : index === last,
-            onclick: () => this.move(index, delta),
-          },
-          delta < 0 ? '↑' : '↓',
-        );
-      return el(
-        'li',
-        { class: `layer-row${entry.visible ? '' : ' off'}` },
-        el(
-          'div',
-          { class: 'layer-head' },
-          el(
-            'label',
-            { class: 'layer-name' },
-            el('input', {
-              type: 'checkbox',
-              checked: entry.visible,
-              onchange: (e: Event) => this.setVisible(entry.id, (e.target as HTMLInputElement).checked),
-            }),
-            el('span', {}, entry.title),
-          ),
-          el('div', { class: 'layer-move' }, moveButton(-1), moveButton(1)),
-        ),
-        el('div', { class: 'layer-opacity' }, slider, el('output', { 'data-layer': entry.id }, `${percent}%`)),
+    const moveButton = (entry: Entry, index: number, delta: -1 | 1) =>
+      el(
+        'button',
+        {
+          type: 'button',
+          'data-move': delta < 0 ? 'up' : 'down',
+          'data-layer': entry.id,
+          title: delta < 0 ? 'Move up' : 'Move down',
+          'aria-label': `Move ${entry.title} ${delta < 0 ? 'up' : 'down'}`,
+          disabled: delta < 0 ? index === 0 : index === last,
+          onclick: () => this.move(index, delta),
+        },
+        delta < 0 ? '↑' : '↓',
       );
-    });
+    const markerRows = this.markers.map((group) => this.row(group));
+    const layerRows = this.entries.map((entry, index) =>
+      this.row(entry, el('div', { class: 'layer-move' }, moveButton(entry, index, -1), moveButton(entry, index, 1))),
+    );
     this.panel.replaceChildren(
       el('h3', {}, 'Layers'),
+      ...(markerRows.length
+        ? [el('h4', { class: 'layer-section' }, 'Markers'), el('ul', { class: 'layer-list' }, ...markerRows)]
+        : []),
+      el('h4', { class: 'layer-section' }, 'Map layers'),
       el('p', { class: 'layer-hint' }, 'Layers higher in the list are drawn on top.'),
-      el('ul', { class: 'layer-list' }, ...rows),
+      el('ul', { class: 'layer-list' }, ...layerRows),
       el('div', { class: 'layer-footer' }, el('button', { type: 'button', class: 'text-btn', onclick: () => this.resetOrder() }, 'Reset order')),
+    );
+  }
+
+  /** A panel row: visibility checkbox and title, optional move buttons, and an opacity slider. */
+  private row(item: { id: string; title: string; visible: boolean; opacity: number }, moveButtons?: HTMLElement) {
+    const percent = Math.round(item.opacity * 100);
+    const slider = el('input', {
+      type: 'range',
+      min: 0,
+      max: 100,
+      step: 5,
+      value: percent,
+      'data-layer': item.id,
+      'aria-label': `${item.title} opacity`,
+    });
+    slider.addEventListener('input', () => this.setOpacity(item.id, Number(slider.value) / 100));
+    return el(
+      'li',
+      { class: `layer-row${item.visible ? '' : ' off'}` },
+      el(
+        'div',
+        { class: 'layer-head' },
+        el(
+          'label',
+          { class: 'layer-name' },
+          el('input', {
+            type: 'checkbox',
+            checked: item.visible,
+            onchange: (e: Event) => this.setVisible(item.id, (e.target as HTMLInputElement).checked),
+          }),
+          el('span', {}, item.title),
+        ),
+        moveButtons,
+      ),
+      el('div', { class: 'layer-opacity' }, slider, el('output', { 'data-layer': item.id }, `${percent}%`)),
     );
   }
 
   /** Saved settings over the defaults: the saved order first, layers added since then at their default position. */
   private restore(): Entry[] {
     const entries = this.defaults.map((entry) => ({ ...entry }));
-    let saved: Saved | null = null;
-    try {
-      saved = JSON.parse(localStorage.getItem(this.storageKey) ?? 'null') as Saved | null;
-    } catch {
-      // Storage unavailable or corrupt entry.
-    }
+    const saved = this.readSaved();
     if (!saved) return entries;
     for (const entry of entries) {
       entry.visible = saved.visible?.[entry.id] ?? entry.visible;
@@ -354,12 +428,21 @@ export class LayerStack implements IControl {
     return order.map((id) => entries.find((entry) => entry.id === id)!);
   }
 
+  private readSaved(): Saved | null {
+    try {
+      return JSON.parse(localStorage.getItem(this.storageKey) ?? 'null') as Saved | null;
+    } catch {
+      return null; // Storage unavailable or corrupt entry.
+    }
+  }
+
   private save() {
     const permanent = this.entries.filter((entry) => !entry.temporary);
+    const rows = [...permanent, ...this.markers];
     const saved: Saved = {
       order: permanent.map((entry) => entry.id),
-      visible: Object.fromEntries(permanent.map((entry) => [entry.id, entry.visible])),
-      opacity: Object.fromEntries(permanent.map((entry) => [entry.id, entry.opacity])),
+      visible: Object.fromEntries(rows.map((row) => [row.id, row.visible])),
+      opacity: Object.fromEntries(rows.map((row) => [row.id, row.opacity])),
     };
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(saved));

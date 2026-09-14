@@ -739,6 +739,15 @@ a.btn {
   font-weight: 600;
 }
 
+.layer-section {
+  margin: 10px 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .layer-hint {
   margin: 0 0 8px;
   color: var(--muted);

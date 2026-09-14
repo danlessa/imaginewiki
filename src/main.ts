@@ -103,6 +103,10 @@ map.on('load', () => {
   layers = new LayerStack(map, { key: city.id, layers: city.layers, basemapTitle: 'OpenHistoricalMap', dataBottom: 'map-footprints' });
   layers.onChange = scheduleRender;
   addDataLayers();
+  layers.addMarkers([
+    { id: 'photographs', title: 'Photographs', layers: ['views-points', 'views-cones', 'views-cones-outline'] },
+    { id: 'landmarks', title: 'Landmarks', layers: ['landmarks', 'landmark-labels'] },
+  ]);
   layers.apply();
   map.addControl(layers, 'top-right');
   applyDateFilter(map, state.year);
@@ -499,7 +503,8 @@ function filteredViews(bounds: LngLatBounds | null) {
       ({ view: v }) =>
         (!range || (v.year != null && v.year >= range[0] && v.year <= range[1])) &&
         (!bounds || bounds.contains([v.lon, v.lat])) &&
-        matchesQuery(v.title, v.creator),
+        // Commons titles often differ from the file name contributors know, so both are searchable.
+        matchesQuery(v.title, v.creator, v.file),
     )
     .sort((a, b) => distance(a.view.year) - distance(b.view.year) || a.view.title.localeCompare(b.view.title));
 }
