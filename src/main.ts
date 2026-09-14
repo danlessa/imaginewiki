@@ -14,6 +14,7 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import type { FeatureCollection } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './style.css';
+import { clearCache } from './cache.ts';
 import {
   commonsEditUrl,
   commonsPage,
@@ -436,6 +437,10 @@ function setupSidebar() {
   $('#detail-back').addEventListener('click', closeDetail);
   $('#sidebar-toggle').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
   $('#about-btn').addEventListener('click', () => $<HTMLDialogElement>('#about').showModal());
+  $('#refresh-btn').addEventListener('click', () => {
+    clearCache();
+    location.reload();
+  });
 
   const citySelect = $<HTMLSelectElement>('#city');
   citySelect.replaceChildren(...CITIES.map((c) => el('option', { value: c.id, selected: c === city }, c.name)));

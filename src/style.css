@@ -860,8 +860,30 @@ a.btn {
     display: inline-grid;
   }
 
+  .refresh-label {
+    display: none;
+  }
+
   .subtitle {
-    visibility: hidden;
+    display: none;
+  }
+
+  #refresh-btn {
+    margin-left: auto;
+  }
+
+  .topbar {
+    gap: 6px;
+    padding-inline: 8px 12px;
+  }
+
+  .brand {
+    font-size: 18px;
+  }
+
+  .city-select {
+    max-width: 7.5rem;
+    padding-inline: 4px;
   }
 
   .sidebar {
@@ -892,5 +914,21 @@ a.btn {
 
   #year-input {
     font-size: 24px;
+  }
+}
+
+/* ------------------------------------------------------------------ small phones */
+
+@media (max-width: 380px) {
+  .brand {
+    font-size: 16px;
+  }
+
+  .city-select {
+    max-width: 6.5rem;
+  }
+
+  #about-btn {
+    padding-inline: 6px;
   }
 }

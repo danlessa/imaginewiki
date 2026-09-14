@@ -22,3 +22,14 @@ export async function cached<T>(key: string, ttl: number, load: () => Promise<T>
   }
   return value;
 }
+
+/** Forgets every cached response, so the next page load fetches fresh data. Layer panel settings are kept. */
+export function clearCache() {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith(PREFIX)) localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage unavailable.
+  }
+}
