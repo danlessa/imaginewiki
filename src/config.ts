@@ -2,23 +2,33 @@ export const MIN_YEAR = 1502;
 export const MAX_YEAR = new Date().getFullYear();
 export const DEFAULT_YEAR = 1900;
 
-/** A georeferenced historical map shown as a raster overlay. */
-export interface HistoricMap {
+/** A raster tile layer that can be shown on the map. */
+export interface RasterLayer {
   id: string;
   title: string;
-  year: number | null;
-  /** West, south, east, north. */
-  bbox: [number, number, number, number];
   /** Raster tile URL template. WMS URLs use MapLibre's {bbox-epsg-3857} placeholder. */
   tiles: string;
   /** `tms` for tile servers that count rows from the bottom. */
   scheme?: 'xyz' | 'tms';
+  /** West, south, east, north; tiles are only requested inside it. */
+  bbox?: [number, number, number, number];
+  minzoom?: number;
+  /** Highest zoom the server has tiles for; MapLibre scales them up beyond it. */
+  maxzoom?: number;
+  /** Starting opacity, 0–1. */
+  opacity?: number;
+  /** HTML credit shown in the map attribution while the layer is visible. */
+  attribution: string;
+}
+
+/** A georeferenced historical map, listed in Maps & Plans. */
+export interface HistoricMap extends RasterLayer {
+  year: number | null;
+  bbox: [number, number, number, number];
   thumb: string;
   link: { label: string; href: string };
   /** Page id of the Commons file the map was warped from, for Wikimaps Warper maps. */
   commonsPageId?: string;
-  /** HTML credit shown in the map attribution while the overlay is on. */
-  attribution: string;
 }
 
 export interface City {
@@ -34,9 +44,12 @@ export interface City {
   mapCategories: string[];
   /** Historical maps from other open tile servers, listed alongside the Wikimaps Warper maps. */
   overlays: HistoricMap[];
+  /** Layers in the map's layer panel besides OpenHistoricalMap, top of the stack first. */
+  layers: RasterLayer[];
 }
 
 const GEOSAMPA_WMS = 'https://raster.geosampa.prefeitura.sp.gov.br/geoserver/geoportal/wms';
+const GEOSAMPA_BBOX: HistoricMap['bbox'] = [-47.4785, -24.1938, -45.7737, -23.1378];
 const GEOSAMPA_ATTRIBUTION =
   '<a href="https://geosampa.prefeitura.sp.gov.br/" target="_blank">GeoSampa</a>, Prefeitura de São Paulo ' +
   '(<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank">CC BY-SA 4.0</a>)';
@@ -64,7 +77,7 @@ function geosampaMap(layer: string, title: string, year: number): HistoricMap {
     id: `geosampa-${layer}`,
     title,
     year,
-    bbox: [-47.4785, -24.1938, -45.7737, -23.1378],
+    bbox: GEOSAMPA_BBOX,
     tiles: wmsTiles(GEOSAMPA_WMS, `geoportal:${layer}`),
     thumb: wmsThumb(GEOSAMPA_WMS, `geoportal:${layer}`, CENTRAL_SAO_PAULO),
     link: { label: 'GeoSampa', href: 'https://geosampa.prefeitura.sp.gov.br/' },
@@ -86,6 +99,27 @@ function pauliceiaMap(layer: string, year: number, bbox: HistoricMap['bbox']): H
     attribution: PAULICEIA_ATTRIBUTION,
   };
 }
+
+const OSM_LAYER: RasterLayer = {
+  id: 'osm',
+  title: 'OpenStreetMap (Mapnik)',
+  tiles: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  maxzoom: 19,
+  opacity: 1,
+  attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>',
+};
+
+const ESRI_WORLD_IMAGERY: RasterLayer = {
+  id: 'esri-world-imagery',
+  title: 'Esri World Imagery',
+  tiles: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  maxzoom: 19,
+  opacity: 1,
+  attribution: 'Imagery © Esri, Maxar, Earthstar Geographics and the GIS User Community',
+};
+
+/** Shared by the layer panel and Maps & Plans, so both show and hide the same layer. */
+const SARA_1930 = geosampaMap('SaraBrasil_1930', 'Mapa Topográfico do Município de São Paulo (SARA Brasil), 1930', 1930);
 
 /** The first city is the default. */
 export const CITIES: City[] = [
@@ -109,8 +143,53 @@ export const CITIES: City[] = [
       pauliceiaMap('1890', 1890, [-46.6568, -23.5707, -46.6024, -23.5133]),
       pauliceiaMap('1905', 1905, [-46.7389, -23.6231, -46.5257, -23.4849]),
       pauliceiaMap('1924', 1924, [-46.7595, -23.6471, -46.5292, -23.4586]),
-      geosampaMap('SaraBrasil_1930', 'Mapa Topográfico do Município de São Paulo (SARA Brasil), 1930', 1930),
+      SARA_1930,
       geosampaMap('Vasp_Cruzeiro', 'Cartas do levantamento aerofotogramétrico VASP Cruzeiro, 1954', 1954),
+    ],
+    layers: [
+      {
+        id: 'topohidrografico',
+        title: 'Mapa Topohidrográfico colorido Sampa',
+        tiles: 'https://telhas.pedalhidrografi.co/rmsampa-v2/{z}/{x}/{y}.png',
+        bbox: [-47.461, -24.207, -45.703, -22.918],
+        minzoom: 8,
+        maxzoom: 16,
+        attribution: 'Topografia colorida · <a href="https://amora.pedalhidrografi.co/" target="_blank">Pedal Hidrográfico</a>',
+      },
+      { ...SARA_1930, title: 'SARA 1930' },
+      {
+        id: 'igg-1895',
+        title: 'IGG 1895',
+        // Sheets of the Comissão Geográfica e Geológica (1895–1920) from the IGC-SP collection, tiled by Ecotono.
+        tiles: 'https://www.ecotono.xyz/anomalias/tiles/igc/{z}/{x}/{y}.webp',
+        bbox: [-47.73, -24.61, -45.08, -22.43],
+        minzoom: 7,
+        maxzoom: 14,
+        attribution:
+          'Folhas 1895–1920 · Comissão Geográfica e Geológica, acervo IGC-SP, via <a href="https://www.ecotono.xyz/anomalias/" target="_blank">Ecotono</a>',
+      },
+      OSM_LAYER,
+      ESRI_WORLD_IMAGERY,
+      {
+        id: 'geosampa-orto-2020',
+        title: 'GeoSampa Ortofoto 2020',
+        tiles: wmsTiles(GEOSAMPA_WMS, 'geoportal:ORTO_RGB_2020'),
+        bbox: GEOSAMPA_BBOX,
+        opacity: 1,
+        attribution: GEOSAMPA_ATTRIBUTION,
+      },
+      {
+        id: 'emplasa-2011',
+        title: 'Ortofotos EMPLASA 2011',
+        tiles: wmsTiles(
+          'https://datageo.ambiente.sp.gov.br/geoimage/datageoimg/ORTOFOTOS_EMPLASA_2010/ows',
+          'ORTOFOTOS_EMPLASA_2010',
+        ),
+        // The state of São Paulo.
+        bbox: [-53.2, -25.4, -44.1, -19.7],
+        opacity: 1,
+        attribution: 'Ortofotos 2010/2011 · EMPLASA, via <a href="https://datageo.ambiente.sp.gov.br/" target="_blank">DataGEO</a>',
+      },
     ],
   },
   {
@@ -123,6 +202,7 @@ export const CITIES: City[] = [
     photoCategories: ['Photographs by Augusto Malta', 'Photographs by Marc Ferrez'],
     mapCategories: ['19th-century maps of Rio de Janeiro', 'Old maps of Rio de Janeiro'],
     overlays: [],
+    layers: [OSM_LAYER, ESRI_WORLD_IMAGERY],
   },
 ];
 

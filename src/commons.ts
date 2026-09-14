@@ -16,14 +16,20 @@ interface SearchPage {
   pageid: number;
   title: string;
   imageinfo?: { extmetadata?: Record<string, { value: string } | undefined> }[];
+  coordinates?: { lat: number; lon: number }[];
+  revisions?: { slots: { main: { content: string } } }[];
 }
 
 const API = 'https://commons.wikimedia.org/w/api.php';
 const FILE_PATH = 'https://commons.wikimedia.org/wiki/Special:FilePath/';
 const YEAR = /\b(1[5-9]\d\d|20[0-2]\d)s?\b/;
+const IMAGE_EXTENSION = /\.[a-z0-9]+$/i;
+const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 /** Search filters for bitmaps with neither a camera nor an object location, as a template or structured data. */
 const UNLOCATED =
   'filetype:bitmap -hastemplate:Location -hastemplate:"Object location" -haswbstatement:P1259 -haswbstatement:P9149';
+/** Search filter for bitmaps with a camera location template. */
+const LOCATED = 'filetype:bitmap hastemplate:Location';
 /** Search filter for maps that aren't georeferenced yet; Commons tags warped maps with this category. */
 const NOT_GEOREFERENCED = 'filetype:bitmap -incategory:"Georeferenced_maps_in_Wikimaps_Warper"';
 const SEARCH_BATCH = 50;
@@ -45,6 +51,17 @@ export const warperImportUrl = (file: CommonsFile) => `https://warper.wmflabs.or
 /** The {{Location}} template for a camera position, which Commons uses to geocode the file. */
 export function locationTemplate({ lat, lon, heading }: { lat: number; lon: number; heading: number }) {
   return `{{Location|${lat.toFixed(5)}|${lon.toFixed(5)}|heading:${Math.round(heading) % 360}}}`;
+}
+
+/** Camera heading from a {{Location}} or {{Camera location}} template, given in degrees or as a compass point. */
+export function headingIn(wikitext: string): number | null {
+  const match = wikitext.match(
+    /\{\{\s*(?:location(?: dec)?|camera location)\s*\|[^}]*?heading:\s*(-?\d+(?:\.\d+)?|[NESW]{1,3})\b/i,
+  );
+  if (!match) return null;
+  const compass = COMPASS.indexOf(match[1].toUpperCase());
+  if (compass >= 0) return compass * 22.5;
+  return ((Number(match[1]) % 360) + 360) % 360;
 }
 
 /** First plausible year (1500–2029) in a piece of text; a decade such as "1920s" counts as its first year. */
@@ -99,7 +116,7 @@ export async function loadCommonsViews(city: City): Promise<View[]> {
   }
 }
 
-// Candidate lists are cached briefly, so files contributors just finished drop off soon.
+// Search results are cached briefly, so work contributors just finished shows up, or drops off lists, soon.
 
 /** Photographs in the city's Commons categories that have no location, oldest first. */
 export const loadLocateCandidates = (city: City) =>
@@ -109,16 +126,70 @@ export const loadLocateCandidates = (city: City) =>
 export const loadGeoreferenceCandidates = (city: City) =>
   cached(`map-candidates:${city.id}`, HOUR, () => searchCategories(city.mapCategories, NOT_GEOREFERENCED));
 
+/**
+ * Photographs in the city's Commons categories that have a camera location, read live so locations added
+ * through the Locate tab appear without waiting for the next Commons snapshot.
+ */
+export const loadLocatedViews = (city: City) =>
+  cached(`located:${city.id}`, HOUR, async () => {
+    const views = new Map<string, View>();
+    for (const category of city.photoCategories) {
+      for (const view of await searchLocated(`incategory:"${category}" ${LOCATED}`)) views.set(view.id, view);
+    }
+    return [...views.values()];
+  });
+
 async function searchCategories(categories: string[], filters: string): Promise<CommonsFile[]> {
   const found = new Map<string, CommonsFile>();
   for (const category of categories) {
-    for (const file of await searchFiles(`incategory:"${category}" ${filters}`)) found.set(file.id, file);
+    for (const page of await searchPages(`incategory:"${category}" ${filters}`)) {
+      const meta = page.imageinfo?.[0]?.extmetadata ?? {};
+      const file = page.title.replace(/^File:/, '');
+      found.set(`M${page.pageid}`, {
+        id: `M${page.pageid}`,
+        title: plainText(meta.ObjectName?.value) ?? file.replace(IMAGE_EXTENSION, ''),
+        file,
+        year: fileYear(meta, file),
+        creator: plainText(meta.Artist?.value),
+      });
+    }
   }
   return [...found.values()].sort((a, b) => (a.year ?? Infinity) - (b.year ?? Infinity) || a.title.localeCompare(b.title));
 }
 
-async function searchFiles(query: string): Promise<CommonsFile[]> {
-  const files: CommonsFile[] = [];
+async function searchLocated(query: string): Promise<View[]> {
+  const pages = await searchPages(query, {
+    prop: 'imageinfo|coordinates|revisions',
+    coprimary: 'primary',
+    colimit: 'max',
+    rvprop: 'content',
+    rvslots: 'main',
+  });
+  return pages.flatMap((page): View[] => {
+    const position = page.coordinates?.[0];
+    if (!position) return [];
+    const meta = page.imageinfo?.[0]?.extmetadata ?? {};
+    const file = page.title.replace(/^File:/, '');
+    return [
+      {
+        id: `M${page.pageid}`,
+        title: plainText(meta.ObjectName?.value) ?? file.replace(IMAGE_EXTENSION, ''),
+        file,
+        year: fileYear(meta, file),
+        lon: position.lon,
+        lat: position.lat,
+        heading: headingIn(page.revisions?.[0]?.slots.main.content ?? ''),
+        creator: plainText(meta.Artist?.value),
+        collection: null,
+        iiif: null,
+      },
+    ];
+  });
+}
+
+/** Files matching a Commons search, with their metadata and any extra `props` requested. */
+async function searchPages(query: string, props: Record<string, string> = {}): Promise<SearchPage[]> {
+  const pages: SearchPage[] = [];
   let offset: number | undefined;
   do {
     const params = new URLSearchParams({
@@ -133,25 +204,19 @@ async function searchFiles(query: string): Promise<CommonsFile[]> {
       prop: 'imageinfo',
       iiprop: 'extmetadata',
       iiextmetadatafilter: 'DateTimeOriginal|ObjectName|Artist',
+      ...props,
     });
     if (offset) params.set('gsroffset', String(offset));
     const res = await fetch(`${API}?${params}`);
     if (!res.ok) throw new Error(`Commons search failed (HTTP ${res.status})`);
-    const json = (await res.json()) as { continue?: { gsroffset: number }; query?: { pages: SearchPage[] } };
-
-    for (const page of json.query?.pages ?? []) {
-      const meta = page.imageinfo?.[0]?.extmetadata ?? {};
-      const file = page.title.replace(/^File:/, '');
-      files.push({
-        id: `M${page.pageid}`,
-        title: plainText(meta.ObjectName?.value) ?? file.replace(/\.[a-z0-9]+$/i, ''),
-        file,
-        // Old maps are often dated only in the file name, e.g. "Planta da Cidade de S. Paulo (1810)".
-        year: (meta.DateTimeOriginal ? commonsDateYear(meta.DateTimeOriginal.value) : null) ?? yearIn(file),
-        creator: plainText(meta.Artist?.value),
-      });
-    }
+    const json = (await res.json()) as { continue?: { gsroffset?: number }; query?: { pages: SearchPage[] } };
+    pages.push(...(json.query?.pages ?? []));
     offset = json.continue?.gsroffset;
-  } while (offset && files.length < FILES_PER_CATEGORY);
-  return files;
+  } while (offset && pages.length < FILES_PER_CATEGORY);
+  return pages;
+}
+
+/** Old files are often dated only in the file name, e.g. "Planta da Cidade de S. Paulo (1810)". */
+function fileYear(meta: Record<string, { value: string } | undefined>, file: string) {
+  return (meta.DateTimeOriginal ? commonsDateYear(meta.DateTimeOriginal.value) : null) ?? yearIn(file);
 }

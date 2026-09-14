@@ -6,7 +6,7 @@ A historical atlas of Brazilian cities (São Paulo by default, plus Rio de Janei
 | --- | --- | --- |
 | Basemap | [OpenHistoricalMap](https://www.openhistoricalmap.org/) vector tiles | Filtered to the selected year with [`maplibre-gl-dates`](https://github.com/OpenHistoricalMap/maplibre-gl-dates) |
 | Views | [Wikidata](https://www.wikidata.org/) + [Wikimedia Commons](https://commons.wikimedia.org/) | Photographs whose point of view (`P1259`) falls inside the city, with heading (`P7787`) and date (`P571`), drawn as view cones. Rio has ~3,500 from the Instituto Moreira Salles; São Paulo has almost none |
-| Views | Wikimedia Commons | Geotagged files inside the city that no Wikidata item uses, with a date (not from Exif) before 1970 and the heading from `{{Location}}`. Collected ahead of time into `public/data/commons-views-<city>.json` |
+| Views | Wikimedia Commons | Geotagged files inside the city that no Wikidata item uses, with a date (not from Exif) before 1970 and the heading from `{{Location}}`. Collected ahead of time into `public/data/commons-views-<city>.json`; photographs in the Locate categories that gain a `{{Location}}` also load live |
 | Landmarks | Wikidata | Items in the city's bounding box with an image and a start date (`P571`/`P580`), hidden after their end date (`P576`/`P582`) |
 | Maps & Plans | [Wikimaps Warper](https://warper.wmflabs.org/) | Commons maps georeferenced by volunteers, shown as raster overlays with adjustable opacity |
 | Maps & Plans | [GeoSampa](https://geosampa.prefeitura.sp.gov.br/) (Prefeitura de São Paulo) | 1930 SARA Brasil map and 1954 VASP Cruzeiro survey charts, via WMS. CC BY-SA 4.0 per GeoSampa's data licence |
@@ -33,6 +33,20 @@ Cities are defined in `src/config.ts` (centre, zoom, bounding box and the Common
 ## Locating photographs
 
 The Locate tab lists photographs from each city's Commons categories that have no camera or object location, neither as a template nor as structured data. A contributor places the camera and its heading on the map, copies the generated `{{Location|lat|lon|heading:…}}` template and pastes it into the file page on Commons. The location is saved on Commons, where every project can use it; imagineWiki stores nothing.
+
+## Layers
+
+The layers button on the map opens a panel with every raster layer and the OpenHistoricalMap basemap in one stack. Each has a visibility checkbox and an opacity slider, and the arrows move it up or down; layers higher in the list are drawn on top. The order and settings are remembered per city in the browser, and historical maps switched on in Maps & Plans join the same stack. Layers are configured per city as `layers` in `src/config.ts`. São Paulo has:
+
+| Layer | Source |
+| --- | --- |
+| Mapa Topohidrográfico colorido Sampa | [Pedal Hidrográfico](https://amora.pedalhidrografi.co/) tiles |
+| SARA 1930 | GeoSampa WMS |
+| IGG 1895 | Comissão Geográfica e Geológica sheets (1895–1920, IGC-SP collection) tiled by [Ecotono](https://www.ecotono.xyz/anomalias/). The tiles need an `Access-Control-Allow-Origin` header to display on another site |
+| OpenStreetMap (Mapnik) | tile.openstreetmap.org, under the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) |
+| Esri World Imagery | ArcGIS Online |
+| GeoSampa Ortofoto 2020 | GeoSampa WMS (`ORTO_RGB_2020`) |
+| Ortofotos EMPLASA 2011 | DataGEO WMS (`ORTOFOTOS_EMPLASA_2010`) |
 
 ## Georeferencing maps
 

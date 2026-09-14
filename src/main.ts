@@ -21,6 +21,7 @@ import {
   loadCommonsViews,
   loadGeoreferenceCandidates,
   loadLocateCandidates,
+  loadLocatedViews,
   locationTemplate,
   warperImportUrl,
   type CommonsFile,
@@ -28,6 +29,7 @@ import {
 import { CITIES, DEFAULT_CITY, DEFAULT_YEAR, MAX_YEAR, MIN_YEAR, OHM_STYLE, type HistoricMap } from './config.ts';
 import { $, el } from './dom.ts';
 import { landmarkPoints, mapFootprints, viewCones, viewPoints } from './geo.ts';
+import { LayerStack } from './layers.ts';
 import { PlacementTool, type Placement } from './locate.ts';
 import { applyDateFilter, softenBasemap, styleFont } from './ohm.ts';
 import { compareMaps, loadHistoricMaps } from './warper.ts';
@@ -43,7 +45,6 @@ type Selection = { kind: 'view' | 'landmark'; index: number };
 const TABS: Tab[] = ['views', 'maps', 'landmarks', 'locate'];
 const LIST_LIMIT = 150;
 const NEAR_YEARS = 25;
-const OVERLAY_OPACITY = 0.85;
 const HISTOGRAM_BIN = 5;
 const PLAY_INTERVAL_MS = 350;
 const DATE_FILTER_DELAY_MS = 150;
@@ -75,7 +76,6 @@ const state = {
   mapCandidates: [] as CommonsFile[],
   mapCandidatesLoaded: false,
   loaded: { views: false, maps: false, landmarks: false, locate: false } as Record<Tab, boolean>,
-  overlays: new Map<string, number>(),
   selected: null as Selection | null,
   hovered: null as string | null,
 };
@@ -94,10 +94,17 @@ map.addControl(new AttributionControl({ compact: true, customAttribution: ATTRIB
 
 const hoverPopup = new Popup({ closeButton: false, closeOnClick: false, offset: 12, maxWidth: '240px' });
 const placement = new PlacementTool(map);
+/** The layer panel, created once the basemap style has loaded. */
+let layers: LayerStack | null = null;
 
 map.on('load', () => {
   softenBasemap(map);
+  // Created before imagineWiki adds its own layers, so it can tell which layers make up the basemap.
+  layers = new LayerStack(map, { key: city.id, layers: city.layers, basemapTitle: 'OpenHistoricalMap', dataBottom: 'map-footprints' });
+  layers.onChange = scheduleRender;
   addDataLayers();
+  layers.apply();
+  map.addControl(layers, 'top-right');
   applyDateFilter(map, state.year);
   updateFilters();
   void loadData();
@@ -107,11 +114,23 @@ map.on('load', () => {
 
 async function loadData() {
   await Promise.all([
-    Promise.all([loadViews(city), loadCommonsViews(city)])
-      .then(([wikidataViews, commonsViews]) => {
-        // A Commons file used by a Wikidata item is already covered by that item.
-        const onWikidata = new Set(wikidataViews.map((v) => v.file));
-        const views = [...wikidataViews, ...commonsViews.filter((v) => !onWikidata.has(v.file))];
+    Promise.all([
+      loadViews(city),
+      // Live, so locations added on Commons show up before the next snapshot.
+      loadLocatedViews(city).catch((error) => {
+        console.warn('Located Commons photographs unavailable', error);
+        return [] as View[];
+      }),
+      loadCommonsViews(city),
+    ])
+      .then(([wikidataViews, locatedViews, commonsViews]) => {
+        // Each file appears once: a Wikidata item first, then live Commons data, then the snapshot.
+        const seen = new Set<string>();
+        const views = [...wikidataViews, ...locatedViews, ...commonsViews].filter((v) => {
+          if (seen.has(v.file)) return false;
+          seen.add(v.file);
+          return true;
+        });
         state.views = views;
         source('views').setData(viewPoints(views));
         source('view-cones').setData(viewCones(views));
@@ -243,23 +262,12 @@ function scheduleDateFilter() {
 }
 
 function toggleOverlay(m: HistoricMap) {
-  const id = `overlay-${m.id}`;
-  if (state.overlays.has(m.id)) {
-    map.removeLayer(id);
-    map.removeSource(id);
-    state.overlays.delete(m.id);
+  if (!layers) return;
+  if (layers.isVisible(m.id)) {
+    layers.hide(m.id);
   } else {
-    map.addSource(id, {
-      type: 'raster',
-      tiles: [m.tiles],
-      tileSize: 256,
-      scheme: m.scheme ?? 'xyz',
-      bounds: m.bbox,
-      attribution: m.attribution,
-    });
-    // Overlays sit above the basemap and below photographs and landmarks.
-    map.addLayer({ id, type: 'raster', source: id, paint: { 'raster-opacity': OVERLAY_OPACITY } }, 'map-footprints');
-    state.overlays.set(m.id, OVERLAY_OPACITY);
+    // Joins the layer panel's stack, on top, above the basemap and below photographs and landmarks.
+    layers.show(m);
     // Only move the camera when the map is out of view; citywide surveys would otherwise zoom out to the metro area.
     const { lng, lat } = map.getCenter();
     const [west, south, east, north] = m.bbox;
@@ -270,8 +278,7 @@ function toggleOverlay(m: HistoricMap) {
 }
 
 function setOverlayOpacity(m: HistoricMap, opacity: number) {
-  state.overlays.set(m.id, opacity);
-  map.setPaintProperty(`overlay-${m.id}`, 'raster-opacity', opacity);
+  layers?.setOpacity(m.id, opacity);
 }
 
 // ---------------------------------------------------------------------------------------------- year
@@ -570,8 +577,8 @@ function viewCard({ view: v, index }: { view: View; index: number }) {
 }
 
 function mapCard({ m, index }: { m: HistoricMap; index: number }) {
-  const opacity = state.overlays.get(m.id);
-  const active = opacity != null;
+  const active = layers?.isVisible(m.id) ?? false;
+  const opacity = layers?.opacityOf(m.id);
   const near = m.year != null && Math.abs(m.year - state.year) <= NEAR_YEARS;
   const key = `map:${index}`;
   return el(
@@ -850,7 +857,7 @@ function startLocating(c: CommonsFile) {
         el('a', { class: 'btn', href: commonsEditUrl(c.file), target: '_blank', rel: 'noopener' }, 'Edit on Commons'),
         link(commonsPage(c.file), 'View file'),
       ),
-      el('p', { class: 'muted' }, 'Once saved on Commons, the photograph shows up on this map after the next Commons snapshot.'),
+      el('p', { class: 'muted' }, 'Once saved on Commons, the photograph shows up on this map within the hour.'),
     ),
   );
 

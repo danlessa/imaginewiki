@@ -4,7 +4,7 @@
 // box. That takes hundreds of API requests, which is why it runs ahead of time instead of in the browser.
 // Run with `npm run snapshot:commons`, optionally followed by city ids to refresh only those.
 import { mkdir, writeFile } from 'node:fs/promises';
-import { commonsDateYear, plainText } from '../src/commons.ts';
+import { commonsDateYear, headingIn, plainText } from '../src/commons.ts';
 import { CITIES, type City } from '../src/config.ts';
 import { fetchViews, type View } from '../src/wikidata.ts';
 
@@ -23,7 +23,6 @@ const BATCH = 50;
 const CONCURRENCY = 2;
 const MAX_RETRIES = 5;
 const IMAGE_FILE = /\.(jpe?g|png|tiff?|webp)$/i;
-const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
 /** South, west, north, east. */
 type Tile = [number, number, number, number];
@@ -153,17 +152,6 @@ async function historicalPhotographs(hits: GeoHit[]): Promise<View[]> {
     views.push(...old);
   });
   return views;
-}
-
-/** Camera heading from a {{Location}} or {{Camera location}} template, given in degrees or as a compass point. */
-function headingIn(wikitext: string): number | null {
-  const match = wikitext.match(
-    /\{\{\s*(?:location(?: dec)?|camera location)\s*\|[^}]*?heading:\s*(-?\d+(?:\.\d+)?|[NESW]{1,3})\b/i,
-  );
-  if (!match) return null;
-  const compass = COMPASS.indexOf(match[1].toUpperCase());
-  if (compass >= 0) return compass * 22.5;
-  return ((Number(match[1]) % 360) + 360) % 360;
 }
 
 async function api(params: Record<string, string>, { allowErrors = false } = {}): Promise<ApiResponse> {
