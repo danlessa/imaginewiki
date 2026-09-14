@@ -735,7 +735,9 @@ function loadMapCandidatesOnce() {
 /** Old Commons maps not yet on Wikimaps Warper, listed under the georeferenced ones. */
 function renderGeoreferenceList() {
   if (!state.mapCandidatesLoaded) return;
-  const candidates = state.mapCandidates.filter((c) => matchesQuery(c.title, c.creator));
+  // Warper doesn't tag Commons files it warps, so also skip files it already serves.
+  const warped = new Set(state.maps.map((m) => m.commonsPageId).filter(Boolean));
+  const candidates = state.mapCandidates.filter((c) => !warped.has(c.id.slice(1)) && matchesQuery(c.title, c.creator));
   $('#list-georef').replaceChildren(...candidates.slice(0, LIST_LIMIT).map(georeferenceCard));
   $('#status-georef').textContent = candidates.length
     ? `${candidates.length} map${candidates.length === 1 ? '' : 's'} on Commons waiting to be georeferenced`

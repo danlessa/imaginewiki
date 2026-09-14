@@ -1,1 +1,21 @@
-[]
+[
+  {
+    "id": "warper-10269",
+    "title": "Planta da Cidade de S. Paulo (1810)",
+    "year": 1810,
+    "bbox": [
+      -46.6541229,
+      -23.5626464,
+      -46.6138902,
+      -23.519779
+    ],
+    "tiles": "https://warper.wmflabs.org/maps/tile/10269/{z}/{x}/{y}.png",
+    "thumb": "https://commons.wikimedia.org/wiki/Special:FilePath/Planta%20da%20Cidade%20de%20S.%20Paulo%20(1810).jpg?width=120",
+    "link": {
+      "label": "Commons",
+      "href": "https://commons.wikimedia.org/wiki/File:Planta_da_Cidade_de_S._Paulo_(1810).jpg"
+    },
+    "commonsPageId": "68098274",
+    "attribution": "<a href=\"https://commons.wikimedia.org/wiki/File:Planta_da_Cidade_de_S._Paulo_(1810).jpg\" target=\"_blank\">Planta da Cidade de S. Paulo (1810)</a> via <a href=\"https://warper.wmflabs.org/\" target=\"_blank\">Wikimaps Warper</a>"
+  }
+]

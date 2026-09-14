@@ -1,10 +1,10 @@
-import { cached, DAY } from './cache.ts';
+import { cached, HOUR } from './cache.ts';
 import { commonsDateYear, commonsThumb, yearIn } from './commons.ts';
 import type { City, HistoricMap } from './config.ts';
 
 interface WarperMap {
   id: string;
-  attributes: { title: string; status: string; bbox: string | null; source_uri: string };
+  attributes: { title: string; status: string; bbox: string | null; source_uri: string; page_id: string | null };
   links: { tiles: string };
 }
 
@@ -21,9 +21,12 @@ const COMMONS_BATCH = 50;
 export const compareMaps = (a: HistoricMap, b: HistoricMap) =>
   (a.year ?? Infinity) - (b.year ?? Infinity) || a.title.localeCompare(b.title);
 
-/** Live maps from Warper, falling back to the city's snapshot in public/data when Warper is unreachable. */
+/**
+ * Live maps from Warper, falling back to the city's snapshot in public/data when Warper is unreachable.
+ * Cached for an hour so maps contributors just georeferenced show up the same day.
+ */
 export const loadHistoricMaps = (city: City) =>
-  cached(`maps:v2:${city.id}`, DAY, async () => {
+  cached(`maps:v3:${city.id}`, HOUR, async () => {
     try {
       return await fetchHistoricMaps(city.bbox);
     } catch (error) {
@@ -60,6 +63,7 @@ export async function fetchHistoricMaps(bbox: City['bbox'], init: RequestInit = 
         tiles: m.links.tiles,
         thumb: commonsThumb(file, 120),
         link: { label: 'Commons', href: m.attributes.source_uri },
+        commonsPageId: m.attributes.page_id ?? undefined,
         attribution: `<a href="${escapeHtml(m.attributes.source_uri)}" target="_blank">${escapeHtml(title)}</a> via <a href="${WARPER}/" target="_blank">Wikimaps Warper</a>`,
       };
     })

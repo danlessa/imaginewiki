@@ -15,6 +15,8 @@ export interface HistoricMap {
   scheme?: 'xyz' | 'tms';
   thumb: string;
   link: { label: string; href: string };
+  /** Page id of the Commons file the map was warped from, for Wikimaps Warper maps. */
+  commonsPageId?: string;
   /** HTML credit shown in the map attribution while the overlay is on. */
   attribution: string;
 }
