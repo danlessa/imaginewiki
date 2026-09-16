@@ -11,6 +11,8 @@ export interface View {
   lon: number;
   lat: number;
   heading: number | null;
+  /** Cone width in degrees, from P4036 field of view. */
+  fov?: number | null;
   creator: string | null;
   collection: string | null;
   iiif: string | null;
@@ -46,14 +48,15 @@ const inBox = ({ bbox: [west, south, east, north] }: City, predicate: string) =>
     bd:serviceParam wikibase:cornerNorthEast "Point(${east} ${north})"^^geo:wktLiteral .
   }`;
 
-// P1259 coordinates of the point of view (qualified by P7787 heading), P18 image, P571 inception,
+// P1259 coordinates of the point of view (qualified by P7787 heading and P4036 field of view), P18 image, P571 inception,
 // P170 creator, P195 collection, P6108 IIIF manifest.
 const viewsQuery = (city: City) => `
-SELECT ?item ?itemLabel ?image ?date ?lat ?lon ?heading ?creatorLabel ?collectionLabel ?iiif WHERE {
+SELECT ?item ?itemLabel ?image ?date ?lat ?lon ?heading ?fov ?creatorLabel ?collectionLabel ?iiif WHERE {
   ${inBox(city, 'P1259')}
   ?item wdt:P18 ?image; p:P1259 ?position .
   ?position psv:P1259 [ wikibase:geoLatitude ?lat; wikibase:geoLongitude ?lon ] .
   OPTIONAL { ?position pq:P7787 ?heading }
+  OPTIONAL { ?position pq:P4036 ?fov }
   OPTIONAL { ?item wdt:P571 ?date }
   OPTIONAL { ?item wdt:P170 ?creator }
   OPTIONAL { ?item wdt:P195 ?collection }
@@ -114,6 +117,7 @@ export async function fetchViews(city: City, init: RequestInit = {}): Promise<Vi
       lon,
       lat,
       heading: row.heading ? Number(row.heading) : null,
+      fov: row.fov ? Number(row.fov) : null,
       creator: labelOf(row.creatorLabel),
       collection: labelOf(row.collectionLabel),
       iiif: row.iiif ?? null,
@@ -196,6 +200,24 @@ async function sparql(query: string, init: RequestInit = {}): Promise<Row[]> {
   return json.results.bindings.map((binding) =>
     Object.fromEntries(Object.entries(binding).map(([key, term]) => [key, term.value])),
   );
+}
+
+/**
+ * A QuickStatements batch that records where a picture was seen from on its Wikidata item: P1259 point of
+ * view with the P7787 heading and P4036 field of view qualifiers, both in degrees (Q28390). Commons'
+ * {{Location}} template has no field of view, so the cone width can only be saved here.
+ */
+export function quickStatementsUrl(qid: string, { lat, lon, heading, fov }: { lat: number; lon: number; heading: number; fov: number }) {
+  const command = [
+    qid,
+    'P1259',
+    `@${lat.toFixed(5)}/${lon.toFixed(5)}`,
+    'P7787',
+    `${Math.round(heading)}U28390`,
+    'P4036',
+    `${Math.round(fov)}U28390`,
+  ].join('|');
+  return `https://quickstatements.toolforge.org/#/v1=${encodeURIComponent(command)}`;
 }
 
 const entityId = (uri: string) => uri.slice(uri.lastIndexOf('/') + 1);

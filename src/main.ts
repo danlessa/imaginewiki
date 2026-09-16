@@ -29,12 +29,12 @@ import {
 } from './commons.ts';
 import { CITIES, DEFAULT_CITY, DEFAULT_YEAR, MAX_YEAR, MIN_YEAR, OHM_STYLE, type HistoricMap } from './config.ts';
 import { $, el } from './dom.ts';
-import { landmarkPoints, mapFootprints, viewCones, viewPoints } from './geo.ts';
+import { DEFAULT_FOV, landmarkPoints, mapFootprints, viewCones, viewPoints } from './geo.ts';
 import { LayerStack } from './layers.ts';
 import { PlacementTool, type Placement } from './locate.ts';
 import { applyDateFilter, softenBasemap, styleFont } from './ohm.ts';
 import { compareMaps, loadHistoricMaps } from './warper.ts';
-import { loadLandmarks, loadPaintings, loadViews, type Landmark, type View } from './wikidata.ts';
+import { loadLandmarks, loadPaintings, loadViews, quickStatementsUrl, type Landmark, type View } from './wikidata.ts';
 
 // MapLibre locates its worker relative to its own module URL, which bundling breaks,
 // so let Vite bundle the worker and hand MapLibre the resulting URL.
@@ -694,6 +694,18 @@ function selectView(index: number, fly: boolean) {
         el('p', { class: 'muted' }, 'Paintings sit on the place they depict, which is not where the painter stood.'),
       el(
         'div',
+        { class: 'card-actions' },
+        el(
+          'button',
+          {
+            class: 'btn small',
+            onclick: () => startPlacing(v, { lon: v.lon, lat: v.lat, heading: v.heading ?? 0, fov: v.fov ?? DEFAULT_FOV }),
+          },
+          v.heading == null ? 'Set the view cone' : 'Reposition or set the cone',
+        ),
+      ),
+      el(
+        'div',
         { class: 'links' },
         v.id.startsWith('Q') && link(`https://www.wikidata.org/wiki/${v.id}`, 'Wikidata'),
         link(commonsPage(v.file), 'Wikimedia Commons'),
@@ -826,7 +838,7 @@ function filteredCandidates() {
 function candidateCard(c: CommonsFile) {
   return el(
     'li',
-    { class: 'card', onclick: () => startLocating(c) },
+    { class: 'card', onclick: () => startPlacing(c) },
     el('img', { src: commonsThumb(c.file, 120), alt: '', loading: 'lazy' }),
     el(
       'div',
@@ -837,19 +849,34 @@ function candidateCard(c: CommonsFile) {
   );
 }
 
-/** Lets a contributor place a photograph's camera on the map and copy the {{Location}} template for Commons. */
-function startLocating(c: CommonsFile) {
+/** A picture with a Commons file that can be placed on the map. */
+type PlaceablePicture = { id: string; title: string; file: string; year: number | null; creator: string | null };
+
+/**
+ * Lets a contributor place where a picture was seen from. Position and heading go to Commons through the
+ * {{Location}} template; the cone width has no place there, so it goes to the picture's Wikidata item.
+ * `initial` reopens a picture that is already located, where it stands.
+ */
+function startPlacing(c: PlaceablePicture, initial?: Placement) {
   setSelection(null);
   if (c.year != null) setYear(c.year);
 
   const template = el('textarea', { class: 'template', readonly: true, rows: 2, 'aria-label': 'Location template' });
   template.placeholder = 'Click the map to place the camera';
-  const heading = el('input', { type: 'range', min: 0, max: 359, step: 1, value: 0, disabled: true, 'aria-label': 'Camera heading' });
-  const headingValue = el('output', {}, '–');
+  const slider = (label: string, min: number, max: number, value: number) =>
+    el('input', { type: 'range', min, max, step: 5, value, disabled: !initial, 'aria-label': label });
+  const heading = slider('Heading', 0, 355, Math.round(initial?.heading ?? 0));
+  const headingValue = el('output', {}, initial ? `${Math.round(initial.heading)}°` : '–');
+  const fov = slider('View cone width', 10, 170, Math.round(initial?.fov ?? DEFAULT_FOV));
+  const fovValue = el('output', {}, `${Math.round(initial?.fov ?? DEFAULT_FOV)}°`);
   // Copying stays disabled until the camera is placed, so an unplaced default can't be pasted into Commons.
-  const copy = el('button', { class: 'btn', disabled: true }, 'Copy template');
+  const copy = el('button', { class: 'btn', disabled: !initial }, 'Copy template');
+  const wikidata = c.id.startsWith('Q')
+    ? el('a', { class: 'btn small', target: '_blank', rel: 'noopener' }, 'Save cone to Wikidata')
+    : null;
 
   heading.addEventListener('input', () => placement.setHeading(Number(heading.value)));
+  fov.addEventListener('input', () => placement.setFov(Number(fov.value)));
   copy.addEventListener('click', () => {
     template.select();
     navigator.clipboard.writeText(template.value).then(
@@ -864,16 +891,16 @@ function startLocating(c: CommonsFile) {
       { class: 'detail-body locate' },
       el(
         'button',
-        { class: 'detail-image', onclick: () => openLightbox(c.file, c.title), 'aria-label': 'Enlarge photograph' },
+        { class: 'detail-image', onclick: () => openLightbox(c.file, c.title), 'aria-label': 'Enlarge picture' },
         el('img', { src: commonsThumb(c.file, 640), alt: c.title }),
       ),
       el('h2', {}, c.title),
-      el('dl', { class: 'facts' }, fact('Date', c.year ?? 'Undated'), fact('Photographer', c.creator)),
+      el('dl', { class: 'facts' }, fact('Date', c.year ?? 'Undated'), fact('Creator', c.creator)),
       el(
         'ol',
         { class: 'steps' },
-        el('li', {}, 'Click the map where the photographer stood. Drag the dot to adjust it.'),
-        el('li', {}, 'Drag the square handle, or use the slider, to point the cone where the camera faced.'),
+        el('li', {}, 'Click the map where the picture was seen from. Drag the dot to adjust it.'),
+        el('li', {}, 'Drag the square handle, or use the sliders, for the direction and how wide the view was.'),
         el(
           'li',
           {},
@@ -881,26 +908,37 @@ function startLocating(c: CommonsFile) {
         ),
       ),
       el('label', { class: 'heading-row' }, 'Heading', heading, headingValue),
+      el('label', { class: 'heading-row' }, 'Cone width', fov, fovValue),
       template,
       el(
         'div',
         { class: 'card-actions' },
         copy,
         el('a', { class: 'btn', href: commonsEditUrl(c.file), target: '_blank', rel: 'noopener' }, 'Edit on Commons'),
+        wikidata,
         link(commonsPage(c.file), 'View file'),
       ),
-      el('p', { class: 'muted' }, 'Once saved on Commons, the photograph shows up on this map within the hour.'),
+      el(
+        'p',
+        { class: 'muted' },
+        wikidata
+          ? 'Commons keeps the position and heading; the cone width fits only on a Wikidata item, so it is saved there.'
+          : 'Commons keeps the position and heading. The cone width needs a Wikidata item, which this file does not have.',
+      ),
     ),
   );
 
   placement.start((p: Placement) => {
     template.value = locationTemplate(p);
-    heading.disabled = false;
-    heading.value = String(Math.round(p.heading));
+    for (const control of [heading, fov]) control.disabled = false;
+    if (document.activeElement !== heading) heading.value = String(Math.round(p.heading));
+    if (document.activeElement !== fov) fov.value = String(Math.round(p.fov));
     headingValue.textContent = `${Math.round(p.heading)}°`;
+    fovValue.textContent = `${Math.round(p.fov)}°`;
     copy.disabled = false;
     copy.textContent = 'Copy template';
-  });
+    if (wikidata) wikidata.href = quickStatementsUrl(c.id, p);
+  }, initial);
 }
 
 // ---------------------------------------------------------------------------------------------- map interaction

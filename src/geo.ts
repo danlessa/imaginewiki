@@ -7,7 +7,8 @@ export const UNDATED = -99999;
 /** End year given to features that still exist. */
 export const ONGOING = 99999;
 
-const CONE_FOV = 60;
+/** Cone width used when nothing is recorded. */
+export const DEFAULT_FOV = 60;
 const CONE_RANGE_METRES = 120;
 const CONE_STEPS = 8;
 const METRES_PER_DEGREE = 111_320;
@@ -34,12 +35,12 @@ export function viewPoints(views: View[], kind: View['kind'] = 'photograph'): Co
 export function viewCones(views: View[]): Collection {
   const features: Feature[] = [];
   views.forEach((v, i) => {
-    if (v.heading == null || (v.kind ?? 'photograph') !== 'photograph') return;
+    if (v.heading == null) return;
     features.push({
       type: 'Feature',
       id: i,
       properties: { year: v.year ?? UNDATED },
-      geometry: { type: 'Polygon', coordinates: [cone(v.lon, v.lat, v.heading)] },
+      geometry: { type: 'Polygon', coordinates: [cone(v.lon, v.lat, v.heading, CONE_RANGE_METRES, v.fov ?? DEFAULT_FOV)] },
     });
   });
   return { type: 'FeatureCollection', features };
@@ -73,11 +74,11 @@ export function mapFootprints(maps: HistoricMap[]): Collection {
 }
 
 /** A field-of-view wedge in front of the camera, with the heading measured clockwise from north. */
-export function cone(lon: number, lat: number, heading: number, range = CONE_RANGE_METRES): Position[] {
+export function cone(lon: number, lat: number, heading: number, range = CONE_RANGE_METRES, fov = DEFAULT_FOV): Position[] {
   const metresPerDegreeLon = METRES_PER_DEGREE * Math.cos((lat * Math.PI) / 180);
   const ring: Position[] = [[lon, lat]];
   for (let step = 0; step <= CONE_STEPS; step++) {
-    const angle = ((heading - CONE_FOV / 2 + (CONE_FOV * step) / CONE_STEPS) * Math.PI) / 180;
+    const angle = ((heading - fov / 2 + (fov * step) / CONE_STEPS) * Math.PI) / 180;
     ring.push([
       lon + (range * Math.sin(angle)) / metresPerDegreeLon,
       lat + (range * Math.cos(angle)) / METRES_PER_DEGREE,

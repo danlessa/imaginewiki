@@ -1,13 +1,15 @@
 import { Marker, type GeoJSONSource, type Map, type MapMouseEvent } from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
 import { el } from './dom.ts';
-import { cone } from './geo.ts';
+import { cone, DEFAULT_FOV } from './geo.ts';
 
 /** A camera position, with the heading in degrees clockwise from north. */
 export interface Placement {
   lon: number;
   lat: number;
   heading: number;
+  /** Cone width in degrees. */
+  fov: number;
 }
 
 const SOURCE = 'placement';
@@ -23,17 +25,22 @@ export class PlacementTool {
   private camera: Marker | null = null;
   private handle: Marker | null = null;
   private heading = 0;
+  private fov = DEFAULT_FOV;
   private onChange: (placement: Placement) => void = () => {};
 
   constructor(map: Map) {
     this.map = map;
   }
 
-  /** Waits for a map click to place the camera, then reports every change to the position or heading. */
-  start(onChange: (placement: Placement) => void) {
+  /**
+   * Waits for a map click to place the camera, then reports every change. `initial` starts from an existing
+   * position instead, for repositioning a picture that is already located.
+   */
+  start(onChange: (placement: Placement) => void, initial?: Placement) {
     this.stop();
     this.active = true;
-    this.heading = 0;
+    this.heading = initial?.heading ?? 0;
+    this.fov = initial?.fov ?? DEFAULT_FOV;
     this.onChange = onChange;
     if (!this.map.getSource(SOURCE)) {
       this.map.addSource(SOURCE, { type: 'geojson', data: EMPTY });
@@ -49,6 +56,7 @@ export class PlacementTool {
     this.map.on('click', this.onMapClick);
     this.map.on('zoom', this.refresh);
     this.map.on('rotate', this.refresh);
+    if (initial) this.place(initial.lon, initial.lat);
   }
 
   stop() {
@@ -71,17 +79,27 @@ export class PlacementTool {
     this.changed();
   }
 
+  setFov(fov: number) {
+    this.fov = fov;
+    this.changed();
+  }
+
   private onMapClick = (e: MapMouseEvent) => {
     // Markers sit above the canvas, so releasing a drag on one also reaches the map.
     if ((e.originalEvent.target as Element).closest('.maplibregl-marker')) return;
+    this.place(e.lngLat.lng, e.lngLat.lat);
+  };
+
+  /** Puts the camera at a point, creating the markers the first time. */
+  private place(lng: number, lat: number) {
     if (this.camera) {
-      this.camera.setLngLat(e.lngLat);
+      this.camera.setLngLat([lng, lat]);
     } else {
       this.camera = new Marker({ element: el('div', { class: 'camera-marker' }), draggable: true })
-        .setLngLat(e.lngLat)
+        .setLngLat([lng, lat])
         .addTo(this.map);
       this.handle = new Marker({ element: el('div', { class: 'aim-marker' }), draggable: true })
-        .setLngLat(e.lngLat)
+        .setLngLat([lng, lat])
         .addTo(this.map);
       this.camera.on('drag', () => {
         this.moveHandle();
@@ -92,7 +110,7 @@ export class PlacementTool {
     }
     this.moveHandle();
     this.changed();
-  };
+  }
 
   /** Turns the camera towards the handle while it is dragged. */
   private aim = () => {
@@ -131,7 +149,7 @@ export class PlacementTool {
           properties: {},
           geometry: {
             type: 'Polygon',
-            coordinates: [cone(position.lng, position.lat, this.heading, position.distanceTo(this.handle.getLngLat()))],
+            coordinates: [cone(position.lng, position.lat, this.heading, position.distanceTo(this.handle.getLngLat()), this.fov)],
           },
         },
       ],
@@ -142,6 +160,6 @@ export class PlacementTool {
     if (!this.camera) return;
     this.draw();
     const { lng, lat } = this.camera.getLngLat();
-    this.onChange({ lon: lng, lat, heading: this.heading });
+    this.onChange({ lon: lng, lat, heading: this.heading, fov: this.fov });
   }
 }
