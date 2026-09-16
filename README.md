@@ -7,6 +7,7 @@ A historical atlas of Brazilian cities (São Paulo by default, plus Rio de Janei
 | Basemap | [OpenHistoricalMap](https://www.openhistoricalmap.org/) vector tiles | Filtered to the selected year with [`maplibre-gl-dates`](https://github.com/OpenHistoricalMap/maplibre-gl-dates) |
 | Views | [Wikidata](https://www.wikidata.org/) + [Wikimedia Commons](https://commons.wikimedia.org/) | Photographs whose point of view (`P1259`) falls inside the city, with heading (`P7787`) and date (`P571`), drawn as view cones. Rio has ~3,500 from the Instituto Moreira Salles; São Paulo has almost none |
 | Views | Wikimedia Commons | Geotagged files inside the city that no Wikidata item uses, with a date (not from Exif) before 1970 and the heading from `{{Location}}`. Collected ahead of time into `public/data/commons-views-<city>.json`; photographs in the Locate categories that gain a `{{Location}}` also load live |
+| Views | Wikidata | Paintings (`P31` painting) placed on the specific place they depict (`P180` → `P625`), skipping those that only depict the city |
 | Landmarks | Wikidata | Items in the city's bounding box with an image and a start date (`P571`/`P580`), hidden after their end date (`P576`/`P582`) |
 | Maps & Plans | [Wikimaps Warper](https://warper.wmflabs.org/) | Commons maps georeferenced by volunteers, shown as raster overlays with adjustable opacity |
 | Maps & Plans | [GeoSampa](https://geosampa.prefeitura.sp.gov.br/) (Prefeitura de São Paulo) | 1930 SARA Brasil map and 1954 VASP Cruzeiro survey charts, via WMS. CC BY-SA 4.0 per GeoSampa's data licence |

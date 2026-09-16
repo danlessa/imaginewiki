@@ -16,22 +16,25 @@ type Collection = FeatureCollection<Geometry>;
 
 // Feature ids are array indices so feature-state and list items can refer to the same record.
 
-export function viewPoints(views: View[]): Collection {
-  return {
-    type: 'FeatureCollection',
-    features: views.map((v, i) => ({
+/** Feature ids are indices into the whole list, so photographs and paintings share one numbering. */
+export function viewPoints(views: View[], kind: View['kind'] = 'photograph'): Collection {
+  const features: Feature[] = [];
+  views.forEach((v, i) => {
+    if ((v.kind ?? 'photograph') !== kind) return;
+    features.push({
       type: 'Feature',
       id: i,
       properties: { year: v.year ?? UNDATED },
       geometry: { type: 'Point', coordinates: [v.lon, v.lat] },
-    })),
-  };
+    });
+  });
+  return { type: 'FeatureCollection', features };
 }
 
 export function viewCones(views: View[]): Collection {
   const features: Feature[] = [];
   views.forEach((v, i) => {
-    if (v.heading == null) return;
+    if (v.heading == null || (v.kind ?? 'photograph') !== 'photograph') return;
     features.push({
       type: 'Feature',
       id: i,

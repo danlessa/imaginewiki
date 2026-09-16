@@ -34,7 +34,7 @@ import { LayerStack } from './layers.ts';
 import { PlacementTool, type Placement } from './locate.ts';
 import { applyDateFilter, softenBasemap, styleFont } from './ohm.ts';
 import { compareMaps, loadHistoricMaps } from './warper.ts';
-import { loadLandmarks, loadViews, type Landmark, type View } from './wikidata.ts';
+import { loadLandmarks, loadPaintings, loadViews, type Landmark, type View } from './wikidata.ts';
 
 // MapLibre locates its worker relative to its own module URL, which bundling breaks,
 // so let Vite bundle the worker and hand MapLibre the resulting URL.
@@ -52,6 +52,7 @@ const DATE_FILTER_DELAY_MS = 150;
 
 const VIEW_COLOR = '#c8553d';
 const LANDMARK_COLOR = '#2f6690';
+const PAINTING_COLOR = '#6b4f8a';
 const MAP_COLOR = '#8a6d3b';
 
 const ATTRIBUTION = [
@@ -106,6 +107,7 @@ map.on('load', () => {
   addDataLayers();
   layers.addMarkers([
     { id: 'photographs', title: 'Photographs', layers: ['views-points', 'views-cones', 'views-cones-outline'] },
+    { id: 'paintings', title: 'Paintings', layers: ['paintings'] },
     { id: 'landmarks', title: 'Landmarks', layers: ['landmarks', 'landmark-labels'] },
   ]);
   layers.apply();
@@ -121,6 +123,11 @@ async function loadData() {
   await Promise.all([
     Promise.all([
       loadViews(city),
+      // Paintings sit on the place they depict, so they load alongside the photographs.
+      loadPaintings(city).catch((error) => {
+        console.warn('Paintings unavailable', error);
+        return [] as View[];
+      }),
       // Live, so locations added on Commons show up before the next snapshot.
       loadLocatedViews(city).catch((error) => {
         console.warn('Located Commons photographs unavailable', error);
@@ -128,16 +135,17 @@ async function loadData() {
       }),
       loadCommonsViews(city),
     ])
-      .then(([wikidataViews, locatedViews, commonsViews]) => {
+      .then(([wikidataViews, paintings, locatedViews, commonsViews]) => {
         // Each file appears once: a Wikidata item first, then live Commons data, then the snapshot.
         const seen = new Set<string>();
-        const views = [...wikidataViews, ...locatedViews, ...commonsViews].filter((v) => {
+        const views = [...wikidataViews, ...paintings, ...locatedViews, ...commonsViews].filter((v) => {
           if (seen.has(v.file)) return false;
           seen.add(v.file);
           return true;
         });
         state.views = views;
         source('views').setData(viewPoints(views));
+        source('paintings').setData(viewPoints(views, 'painting'));
         source('view-cones').setData(viewCones(views));
         state.loaded.views = true;
         renderHistogram();
@@ -170,7 +178,7 @@ const source = (id: string) => map.getSource(id) as GeoJSONSource;
 
 function addDataLayers() {
   const empty: FeatureCollection = { type: 'FeatureCollection', features: [] };
-  for (const id of ['map-footprints', 'view-cones', 'views', 'landmarks']) {
+  for (const id of ['map-footprints', 'view-cones', 'views', 'paintings', 'landmarks']) {
     map.addSource(id, { type: 'geojson', data: empty });
   }
   const selected: ExpressionSpecification = ['boolean', ['feature-state', 'selected'], false];
@@ -213,6 +221,17 @@ function addDataLayers() {
     },
   });
   map.addLayer({
+    id: 'paintings',
+    type: 'circle',
+    source: 'paintings',
+    paint: {
+      'circle-color': PAINTING_COLOR,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 3, 17, 7],
+      'circle-stroke-color': '#fff',
+      'circle-stroke-width': ['case', emphasized, 3, 1.5],
+    },
+  });
+  map.addLayer({
     id: 'landmarks',
     type: 'circle',
     source: 'landmarks',
@@ -247,7 +266,7 @@ function updateFilters() {
   const viewFilter: FilterSpecification | null = range
     ? ['all', ['>=', ['get', 'year'], range[0]], ['<=', ['get', 'year'], range[1]]]
     : null;
-  for (const id of ['views-points', 'views-cones', 'views-cones-outline']) map.setFilter(id, viewFilter);
+  for (const id of ['views-points', 'views-cones', 'views-cones-outline', 'paintings']) map.setFilter(id, viewFilter);
 
   const landmarkFilter: FilterSpecification = [
     'all',
@@ -581,7 +600,7 @@ function viewCard({ view: v, index }: { view: View; index: number }) {
       'div',
       { class: 'card-body' },
       el('div', { class: 'card-title' }, v.title),
-      el('div', { class: 'card-meta' }, [v.year ?? 'Undated', v.creator].filter(Boolean).join(' · ')),
+      el('div', { class: 'card-meta' }, [v.year ?? 'Undated', v.creator, v.kind === 'painting' && 'painting'].filter(Boolean).join(' · ')),
     ),
   );
 }
@@ -666,10 +685,13 @@ function selectView(index: number, fly: boolean) {
         'dl',
         { class: 'facts' },
         fact('Date', v.year ?? 'Undated'),
-        fact('Photographer', v.creator),
+        fact(v.kind === 'painting' ? 'Painter' : 'Photographer', v.creator),
         fact('Collection', v.collection),
+        fact('Depicts', v.depicts ?? null),
         v.heading != null && fact('Camera heading', `${Math.round(v.heading)}°`),
       ),
+      v.kind === 'painting' &&
+        el('p', { class: 'muted' }, 'Paintings sit on the place they depict, which is not where the painter stood.'),
       el(
         'div',
         { class: 'links' },
@@ -883,7 +905,7 @@ function startLocating(c: CommonsFile) {
 
 // ---------------------------------------------------------------------------------------------- map interaction
 
-const INTERACTIVE_LAYERS = ['landmarks', 'views-points', 'views-cones'];
+const INTERACTIVE_LAYERS = ['landmarks', 'paintings', 'views-points', 'views-cones'];
 
 function setupMapInteraction() {
   map.on('click', (e) => {
@@ -911,7 +933,7 @@ function featureAt(point: { x: number; y: number }) {
 }
 
 const FEATURE_SOURCES: Record<string, string[]> = {
-  view: ['views', 'view-cones'],
+  view: ['views', 'paintings', 'view-cones'],
   landmark: ['landmarks'],
   map: ['map-footprints'],
 };

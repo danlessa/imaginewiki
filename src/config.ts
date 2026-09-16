@@ -34,6 +34,8 @@ export interface HistoricMap extends RasterLayer {
 export interface City {
   id: string;
   name: string;
+  /** Wikidata item for the city, used to skip paintings that depict it as a whole. */
+  wikidataId: string;
   center: [number, number];
   zoom: number;
   /** West, south, east, north. Photographs, landmarks and maps are limited to this box. */
@@ -129,6 +131,7 @@ export const CITIES: City[] = [
   {
     id: 'sao-paulo',
     name: 'São Paulo',
+    wikidataId: 'Q174',
     center: [-46.634, -23.548],
     zoom: 14,
     bbox: [-46.85, -24.01, -46.36, -23.35],
@@ -198,6 +201,7 @@ export const CITIES: City[] = [
   {
     id: 'rio',
     name: 'Rio de Janeiro',
+    wikidataId: 'Q8678',
     center: [-43.1822, -22.9068],
     zoom: 14,
     // Covers the city plus the bay, so whole-city maps fit inside it.

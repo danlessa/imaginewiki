@@ -14,6 +14,10 @@ export interface View {
   creator: string | null;
   collection: string | null;
   iiif: string | null;
+  /** Photographs are positioned where the camera stood; paintings where the place they depict is. */
+  kind?: 'photograph' | 'painting';
+  /** The place a painting depicts. */
+  depicts?: string | null;
 }
 
 /** A place or structure with an image and a start date. */
@@ -71,7 +75,23 @@ SELECT ?item ?itemLabel ?image ?start ?end ?lat ?lon ?typeLabel ?article WHERE {
   SERVICE wikibase:label { bd:serviceParam wikibase:language "${LABEL_LANGUAGES}". }
 }`;
 
+// P31/P279* Q3305213 painting, P180 depicts, P131 located in the administrative territorial entity.
+// Paintings have no camera position, so they are placed on the specific place they depict; requiring that
+// place to sit inside an administrative area keeps real places and drops eras and events.
+const paintingsQuery = (city: City) => `
+SELECT ?item ?itemLabel ?image ?date ?creatorLabel ?subject ?subjectLabel ?lat ?lon WHERE {
+  ?item wdt:P31/wdt:P279* wd:Q3305213; wdt:P18 ?image; wdt:P180 ?subject .
+  ?subject wdt:P131 ?admin; p:P625/psv:P625 [ wikibase:geoLatitude ?lat; wikibase:geoLongitude ?lon ] .
+  FILTER(?lat > ${city.bbox[1]} && ?lat < ${city.bbox[3]} && ?lon > ${city.bbox[0]} && ?lon < ${city.bbox[2]})
+  OPTIONAL { ?item wdt:P571 ?date }
+  OPTIONAL { ?item wdt:P170 ?creator }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "${LABEL_LANGUAGES}". }
+}`;
+
 export const loadViews = (city: City) => cached(`views:${city.id}:${LABEL_LANGUAGES}`, DAY, () => fetchViews(city));
+
+export const loadPaintings = (city: City) =>
+  cached(`paintings:${city.id}:${LABEL_LANGUAGES}`, DAY, () => fetchPaintings(city));
 
 export const loadLandmarks = (city: City) =>
   cached(`landmarks:${city.id}:${LABEL_LANGUAGES}`, DAY, () => fetchLandmarks(city));
@@ -100,6 +120,39 @@ export async function fetchViews(city: City, init: RequestInit = {}): Promise<Vi
     });
   }
   return [...views.values()];
+}
+
+/** Paintings placed on the place they depict, skipping those that only depict the city as a whole. */
+async function fetchPaintings(city: City): Promise<View[]> {
+  const chosen = new Map<string, Row>();
+  for (const row of await sparql(paintingsQuery(city))) {
+    const id = entityId(row.item!);
+    const known = chosen.get(id);
+    // A painting can depict several places; a named place beats the city as a whole.
+    const better = !known || (entityId(row.subject!) !== city.wikidataId && entityId(known.subject!) === city.wikidataId);
+    if (better) chosen.set(id, row);
+  }
+  const paintings: View[] = [];
+  for (const [id, row] of chosen) {
+    // Paintings that only depict the city would all pile up on its centre.
+    if (entityId(row.subject!) === city.wikidataId) continue;
+    const file = fileName(row.image!);
+    paintings.push({
+      id,
+      title: labelOf(row.itemLabel) ?? fileTitle(file),
+      file,
+      year: yearOf(row.date),
+      lon: Number(row.lon),
+      lat: Number(row.lat),
+      heading: null,
+      creator: labelOf(row.creatorLabel),
+      collection: null,
+      iiif: null,
+      kind: 'painting',
+      depicts: labelOf(row.subjectLabel),
+    });
+  }
+  return paintings;
 }
 
 async function fetchLandmarks(city: City): Promise<Landmark[]> {
