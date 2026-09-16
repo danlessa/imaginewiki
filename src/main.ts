@@ -19,6 +19,7 @@ import {
   commonsEditUrl,
   commonsPage,
   commonsThumb,
+  loadCommonsPositions,
   loadCommonsViews,
   loadGeoreferenceCandidates,
   loadLocateCandidates,
@@ -26,6 +27,7 @@ import {
   locationTemplate,
   warperImportUrl,
   type CommonsFile,
+  type CommonsPosition,
 } from './commons.ts';
 import { CITIES, DEFAULT_CITY, DEFAULT_YEAR, MAX_YEAR, MIN_YEAR, OHM_STYLE, type HistoricMap } from './config.ts';
 import { $, el } from './dom.ts';
@@ -123,11 +125,24 @@ async function loadData() {
   await Promise.all([
     Promise.all([
       loadViews(city),
-      // Paintings sit on the place they depict, so they load alongside the photographs.
-      loadPaintings(city).catch((error) => {
-        console.warn('Paintings unavailable', error);
-        return [] as View[];
-      }),
+      // Paintings sit on the place they depict, unless Commons records where the painter stood.
+      loadPaintings(city)
+        .then(async (paintings) => {
+          const positions = await loadCommonsPositions(city.id, paintings.map((p) => p.file)).catch(
+            (error): Record<string, CommonsPosition> => {
+              console.warn('Commons positions unavailable', error);
+              return {};
+            },
+          );
+          return paintings.map((painting) => {
+            const position = positions[painting.file];
+            return position ? { ...painting, lon: position.lon, lat: position.lat, heading: position.heading } : painting;
+          });
+        })
+        .catch((error) => {
+          console.warn('Paintings unavailable', error);
+          return [] as View[];
+        }),
       // Live, so locations added on Commons show up before the next snapshot.
       loadLocatedViews(city).catch((error) => {
         console.warn('Located Commons photographs unavailable', error);
@@ -688,9 +703,10 @@ function selectView(index: number, fly: boolean) {
         fact(v.kind === 'painting' ? 'Painter' : 'Photographer', v.creator),
         fact('Collection', v.collection),
         fact('Depicts', v.depicts ?? null),
-        v.heading != null && fact('Camera heading', `${Math.round(v.heading)}°`),
+        v.heading != null && fact(v.kind === 'painting' ? 'Heading' : 'Camera heading', `${Math.round(v.heading)}°`),
       ),
       v.kind === 'painting' &&
+        v.heading == null &&
         el('p', { class: 'muted' }, 'Paintings sit on the place they depict, which is not where the painter stood.'),
       el(
         'div',

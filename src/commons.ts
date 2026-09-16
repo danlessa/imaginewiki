@@ -12,6 +12,19 @@ export interface CommonsFile {
   creator: string | null;
 }
 
+/** A camera position recorded on a Commons file. */
+export interface CommonsPosition {
+  lat: number;
+  lon: number;
+  heading: number | null;
+}
+
+interface PositionPage {
+  title: string;
+  coordinates?: { lat: number; lon: number; type?: string }[];
+  revisions?: { slots: { main: { content: string } } }[];
+}
+
 interface SearchPage {
   pageid: number;
   title: string;
@@ -33,6 +46,8 @@ const LOCATED = 'filetype:bitmap hastemplate:Location';
 /** Search filter for maps that aren't georeferenced yet; Commons tags warped maps with this category. */
 const NOT_GEOREFERENCED = 'filetype:bitmap -incategory:"Georeferenced_maps_in_Wikimaps_Warper"';
 const SEARCH_BATCH = 50;
+/** Most titles the Commons API accepts in one query. */
+const TITLE_BATCH = 50;
 const FILES_PER_CATEGORY = 200;
 const EDIT_SUMMARY = 'Camera location and heading from imagineWiki #imagineWiki';
 
@@ -138,6 +153,49 @@ export const loadLocatedViews = (city: City) =>
     }
     return [...views.values()];
   });
+
+/**
+ * Camera positions and headings that Commons records for the given files, keyed by file name. Paintings are
+ * placed on the place they depict until someone records where the painter stood, which lands here.
+ */
+export const loadCommonsPositions = (key: string, files: string[]) =>
+  cached(`positions:${key}`, HOUR, () => fetchCommonsPositions(files));
+
+async function fetchCommonsPositions(files: string[]): Promise<Record<string, CommonsPosition>> {
+  const positions: Record<string, CommonsPosition> = {};
+  for (let i = 0; i < files.length; i += TITLE_BATCH) {
+    const params = new URLSearchParams({
+      action: 'query',
+      format: 'json',
+      formatversion: '2',
+      origin: '*',
+      titles: files
+        .slice(i, i + TITLE_BATCH)
+        .map((file) => `File:${file}`)
+        .join('|'),
+      prop: 'coordinates|revisions',
+      coprop: 'type',
+      coprimary: 'all',
+      colimit: 'max',
+      rvprop: 'content',
+      rvslots: 'main',
+    });
+    const res = await fetch(`${API}?${params}`);
+    if (!res.ok) continue;
+    const json = (await res.json()) as { query?: { pages: PositionPage[] } };
+    for (const page of json.query?.pages ?? []) {
+      // Camera locations say where the picture was taken from; an object location is the subject instead.
+      const camera = page.coordinates?.find((c) => c.type === 'camera');
+      if (!camera) continue;
+      positions[page.title.replace(/^File:/, '')] = {
+        lat: camera.lat,
+        lon: camera.lon,
+        heading: headingIn(page.revisions?.[0]?.slots.main.content ?? ''),
+      };
+    }
+  }
+  return positions;
+}
 
 async function searchCategories(categories: string[], filters: string): Promise<CommonsFile[]> {
   const found = new Map<string, CommonsFile>();
