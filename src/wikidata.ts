@@ -81,11 +81,18 @@ SELECT ?item ?itemLabel ?image ?start ?end ?lat ?lon ?typeLabel ?article WHERE {
 // P31/P279* Q3305213 painting, P180 depicts, P131 located in the administrative territorial entity.
 // Paintings have no camera position, so they are placed on the specific place they depict; requiring that
 // place to sit inside an administrative area keeps real places and drops eras and events.
+// The query starts from places inside the city: starting from every painting on Wikidata took a minute.
 const paintingsQuery = (city: City) => `
 SELECT ?item ?itemLabel ?image ?date ?creatorLabel ?subject ?subjectLabel ?lat ?lon WHERE {
-  ?item wdt:P31/wdt:P279* wd:Q3305213; wdt:P18 ?image; wdt:P180 ?subject .
-  ?subject wdt:P131 ?admin; p:P625/psv:P625 [ wikibase:geoLatitude ?lat; wikibase:geoLongitude ?lon ] .
-  FILTER(?lat > ${city.bbox[1]} && ?lat < ${city.bbox[3]} && ?lon > ${city.bbox[0]} && ?lon < ${city.bbox[2]})
+  SERVICE wikibase:box {
+    ?subject wdt:P625 ?location .
+    bd:serviceParam wikibase:cornerSouthWest "Point(${city.bbox[0]} ${city.bbox[1]})"^^geo:wktLiteral .
+    bd:serviceParam wikibase:cornerNorthEast "Point(${city.bbox[2]} ${city.bbox[3]})"^^geo:wktLiteral .
+  }
+  ?subject wdt:P131 ?admin .
+  ?item wdt:P180 ?subject; wdt:P18 ?image; wdt:P31/wdt:P279* wd:Q3305213 .
+  BIND(geof:latitude(?location) AS ?lat)
+  BIND(geof:longitude(?location) AS ?lon)
   OPTIONAL { ?item wdt:P571 ?date }
   OPTIONAL { ?item wdt:P170 ?creator }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "${LABEL_LANGUAGES}". }
@@ -94,7 +101,7 @@ SELECT ?item ?itemLabel ?image ?date ?creatorLabel ?subject ?subjectLabel ?lat ?
 export const loadViews = (city: City) => cached(`views:${city.id}:${LABEL_LANGUAGES}`, DAY, () => fetchViews(city));
 
 export const loadPaintings = (city: City) =>
-  cached(`paintings:${city.id}:${LABEL_LANGUAGES}`, DAY, () => fetchPaintings(city));
+  cached(`paintings:v2:${city.id}:${LABEL_LANGUAGES}`, DAY, () => fetchPaintings(city));
 
 export const loadLandmarks = (city: City) =>
   cached(`landmarks:${city.id}:${LABEL_LANGUAGES}`, DAY, () => fetchLandmarks(city));

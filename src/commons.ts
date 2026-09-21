@@ -147,10 +147,12 @@ export const loadGeoreferenceCandidates = (city: City) =>
  */
 export const loadLocatedViews = (city: City) =>
   cached(`located:${city.id}`, HOUR, async () => {
+    // Categories are searched side by side; one slow search no longer holds up the rest.
+    const results = await Promise.all(
+      city.photoCategories.map((category) => searchLocated(`incategory:"${category}" ${LOCATED}`)),
+    );
     const views = new Map<string, View>();
-    for (const category of city.photoCategories) {
-      for (const view of await searchLocated(`incategory:"${category}" ${LOCATED}`)) views.set(view.id, view);
-    }
+    for (const view of results.flat()) views.set(view.id, view);
     return [...views.values()];
   });
 
@@ -199,8 +201,9 @@ async function fetchCommonsPositions(files: string[]): Promise<Record<string, Co
 
 async function searchCategories(categories: string[], filters: string): Promise<CommonsFile[]> {
   const found = new Map<string, CommonsFile>();
-  for (const category of categories) {
-    for (const page of await searchPages(`incategory:"${category}" ${filters}`)) {
+  const results = await Promise.all(categories.map((category) => searchPages(`incategory:"${category}" ${filters}`)));
+  for (const pages of results) {
+    for (const page of pages) {
       const meta = page.imageinfo?.[0]?.extmetadata ?? {};
       const file = page.title.replace(/^File:/, '');
       found.set(`M${page.pageid}`, {

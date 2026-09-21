@@ -123,49 +123,7 @@ map.on('load', () => {
 
 async function loadData() {
   await Promise.all([
-    Promise.all([
-      loadViews(city),
-      // Paintings sit on the place they depict, unless Commons records where the painter stood.
-      loadPaintings(city)
-        .then(async (paintings) => {
-          const positions = await loadCommonsPositions(city.id, paintings.map((p) => p.file)).catch(
-            (error): Record<string, CommonsPosition> => {
-              console.warn('Commons positions unavailable', error);
-              return {};
-            },
-          );
-          return paintings.map((painting) => {
-            const position = positions[painting.file];
-            return position ? { ...painting, lon: position.lon, lat: position.lat, heading: position.heading } : painting;
-          });
-        })
-        .catch((error) => {
-          console.warn('Paintings unavailable', error);
-          return [] as View[];
-        }),
-      // Live, so locations added on Commons show up before the next snapshot.
-      loadLocatedViews(city).catch((error) => {
-        console.warn('Located Commons photographs unavailable', error);
-        return [] as View[];
-      }),
-      loadCommonsViews(city),
-    ])
-      .then(([wikidataViews, paintings, locatedViews, commonsViews]) => {
-        // Each file appears once: a Wikidata item first, then live Commons data, then the snapshot.
-        const seen = new Set<string>();
-        const views = [...wikidataViews, ...paintings, ...locatedViews, ...commonsViews].filter((v) => {
-          if (seen.has(v.file)) return false;
-          seen.add(v.file);
-          return true;
-        });
-        state.views = views;
-        source('views').setData(viewPoints(views));
-        source('paintings').setData(viewPoints(views, 'painting'));
-        source('view-cones').setData(viewCones(views));
-        state.loaded.views = true;
-        renderHistogram();
-      })
-      .catch((error) => setStatus('views', `Could not load photographs: ${error.message}`)),
+    loadPictures(),
     loadLandmarks(city)
       .then((landmarks) => {
         state.landmarks = landmarks;
@@ -187,6 +145,62 @@ async function loadData() {
         renderMapMarkers();
       }),
   ].map((load) => load.finally(scheduleRender)));
+}
+
+/**
+ * Pictures come from four sources of very different speed, so each one is drawn as soon as it arrives
+ * instead of all of them waiting for the slowest.
+ */
+function loadPictures() {
+  // Merge order, which also decides who wins when two sources have the same file:
+  // a Wikidata item first, then live Commons data, then the snapshot.
+  const parts: Record<'wikidata' | 'paintings' | 'located' | 'snapshot', View[]> = {
+    wikidata: [],
+    paintings: [],
+    located: [],
+    snapshot: [],
+  };
+  const show = (part: keyof typeof parts) => (views: View[]) => {
+    parts[part] = views;
+    const seen = new Set<string>();
+    state.views = [...parts.wikidata, ...parts.paintings, ...parts.located, ...parts.snapshot].filter((v) => {
+      if (seen.has(v.file)) return false;
+      seen.add(v.file);
+      return true;
+    });
+    // Features are numbered by their place in the list, which just changed.
+    setSelection(null);
+    setHover(null);
+    source('views').setData(viewPoints(state.views));
+    source('paintings').setData(viewPoints(state.views, 'painting'));
+    source('view-cones').setData(viewCones(state.views));
+    state.loaded.views = true;
+    renderHistogram();
+    scheduleRender();
+  };
+  const optional = (what: string) => (error: unknown) => console.warn(`${what} unavailable`, error);
+
+  return Promise.all([
+    loadViews(city)
+      .then(show('wikidata'))
+      .catch((error) => setStatus('views', `Could not load photographs from Wikidata: ${error.message}`)),
+    // Paintings sit on the place they depict, unless Commons records where the painter stood.
+    loadPaintings(city)
+      .then(async (paintings) => {
+        show('paintings')(paintings);
+        const positions = await loadCommonsPositions(city.id, paintings.map((p) => p.file));
+        show('paintings')(
+          paintings.map((painting) => {
+            const position: CommonsPosition | undefined = positions[painting.file];
+            return position ? { ...painting, lon: position.lon, lat: position.lat, heading: position.heading } : painting;
+          }),
+        );
+      })
+      .catch(optional('Paintings')),
+    // Live, so locations added on Commons show up before the next snapshot.
+    loadLocatedViews(city).then(show('located')).catch(optional('Located Commons photographs')),
+    loadCommonsViews(city).then(show('snapshot')),
+  ]);
 }
 
 const source = (id: string) => map.getSource(id) as GeoJSONSource;
