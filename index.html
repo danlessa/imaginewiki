@@ -19,7 +19,6 @@
   <body>
     <div id="app">
       <header class="topbar">
-        <button id="sidebar-toggle" class="icon-btn" aria-label="Toggle sidebar">☰</button>
         <a class="brand" href="./">imagine<span>Wiki</span></a>
         <select id="city" class="city-select" aria-label="City"></select>
         <p id="subtitle" class="subtitle"></p>
@@ -30,6 +29,7 @@
       </header>
 
       <aside id="sidebar" class="sidebar">
+        <div id="sheet-handle" class="sheet-handle" role="button" aria-label="Resize panel"><span></span></div>
         <section id="browse">
           <div class="search">
             <input id="search" type="search" placeholder="Search photographs, maps and landmarks" autocomplete="off" />

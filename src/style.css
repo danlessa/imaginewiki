@@ -137,10 +137,6 @@ button {
   font-size: 13px;
 }
 
-#sidebar-toggle {
-  display: none;
-}
-
 /* ------------------------------------------------------------------ sidebar */
 
 .sidebar {
@@ -355,6 +351,67 @@ button {
   max-height: 60vh;
   object-fit: contain;
   background: #222;
+}
+
+.sheet-handle {
+  display: none;
+}
+
+.detail-image {
+  touch-action: pan-y;
+}
+
+.walk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.walk .text-btn {
+  color: var(--landmark);
+}
+
+.walk .text-btn:disabled {
+  color: var(--line);
+  cursor: default;
+}
+
+.walk-hint {
+  display: none;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.enter-next {
+  animation: enter-from-right 0.28s ease-out;
+}
+
+.enter-back {
+  animation: enter-from-left 0.28s ease-out;
+}
+
+@keyframes enter-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+@keyframes enter-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter-next,
+  .enter-back {
+    animation: none;
+  }
 }
 
 .detail-body h2 {
@@ -912,6 +969,7 @@ a.btn {
 @media (max-width: 760px) {
   :root {
     --timeline: 84px;
+    --peek: 84px;
   }
 
   .layer-panel {
@@ -923,10 +981,6 @@ a.btn {
   #app {
     grid-template-columns: 1fr;
     grid-template-areas: 'top' 'map' 'time';
-  }
-
-  #sidebar-toggle {
-    display: inline-grid;
   }
 
   .refresh-label {
@@ -955,20 +1009,63 @@ a.btn {
     padding-inline: 4px;
   }
 
+  /* The sidebar becomes a bottom sheet over the map; sheet.ts sets its height. */
   .sidebar {
     position: fixed;
-    top: calc(var(--topbar) + env(safe-area-inset-top));
+    right: env(safe-area-inset-right);
     bottom: calc(var(--timeline) + env(safe-area-inset-bottom));
     left: env(safe-area-inset-left);
     z-index: 10;
-    width: min(92vw, 380px);
-    transform: translateX(-100%);
-    transition: transform 0.2s ease;
-    box-shadow: 4px 0 18px rgb(0 0 0 / 0.12);
+    height: var(--peek);
+    overflow: hidden;
+    border: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 18px rgb(0 0 0 / 0.14);
+    transition: height 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.08);
   }
 
-  .sidebar.open {
-    transform: none;
+  .sidebar.dragging {
+    transition: none;
+  }
+
+  .sheet-handle {
+    display: grid;
+    flex: none;
+    place-items: center;
+    height: 22px;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .walk-hint {
+    display: block;
+  }
+
+  /* Leave room for the title and walk buttons when the sheet is half open. */
+  .detail-image img {
+    height: 24dvh;
+    object-fit: cover;
+  }
+
+  .back {
+    margin-top: 0;
+  }
+
+  .sheet-handle span {
+    width: 40px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--line);
+  }
+
+  .search {
+    padding-top: 0;
+  }
+
+  /* Keep the scale and attribution clear of the peeking sheet. */
+  .maplibregl-ctrl-bottom-left,
+  .maplibregl-ctrl-bottom-right {
+    bottom: var(--peek);
   }
 
   .timeline {

@@ -32,9 +32,11 @@ import {
 import { CITIES, DEFAULT_CITY, DEFAULT_YEAR, MAX_YEAR, MIN_YEAR, OHM_STYLE, type City, type HistoricMap } from './config.ts';
 import { $, el } from './dom.ts';
 import { DEFAULT_FOV, landmarkPoints, mapFootprints, viewCones, viewPoints } from './geo.ts';
+import { tap, tick } from './haptics.ts';
 import { LayerStack } from './layers.ts';
 import { PlacementTool, type Placement } from './locate.ts';
 import { MyLocationControl } from './mylocation.ts';
+import { isNarrow, setSheet, setupSheet, sheetCover, sheetState } from './sheet.ts';
 import { applyDateFilter, softenBasemap, styleFont } from './ohm.ts';
 import { compareMaps, loadHistoricMaps } from './warper.ts';
 import { loadLandmarks, loadPaintings, loadViews, quickStatementsUrl, type Landmark, type View } from './wikidata.ts';
@@ -49,6 +51,9 @@ type Selection = { kind: 'view' | 'landmark'; index: number };
 const TABS: Tab[] = ['views', 'maps', 'landmarks', 'locate'];
 const LIST_LIMIT = 150;
 const NEAR_YEARS = 25;
+/** A horizontal drag longer than this on a picture walks to the next or previous one. */
+const SWIPE_PX = 50;
+const CAN_HOVER = window.matchMedia('(hover: hover)');
 const HISTOGRAM_BIN = 5;
 const PLAY_INTERVAL_MS = 350;
 const DATE_FILTER_DELAY_MS = 150;
@@ -388,7 +393,9 @@ function setupTimeline() {
   }
   range.addEventListener('input', () => {
     stopPlay();
+    const before = state.year;
     setYear(Number(range.value));
+    if (Math.floor(before / 10) !== Math.floor(state.year / 10)) tick();
   });
   input.addEventListener('change', () => setYear(Number(input.value)));
   input.addEventListener('keydown', (e) => e.key === 'Enter' && input.blur());
@@ -470,6 +477,7 @@ function setupSidebar() {
   for (const button of document.querySelectorAll<HTMLButtonElement>('.tabs button')) {
     button.addEventListener('click', () => selectTab(button.dataset.tab as Tab));
   }
+  $<HTMLInputElement>('#search').addEventListener('focus', () => isNarrow() && setSheet('full'));
   $<HTMLInputElement>('#search').addEventListener('input', (e) => {
     state.query = normalize((e.target as HTMLInputElement).value);
     scheduleRender();
@@ -485,7 +493,7 @@ function setupSidebar() {
     scheduleRender();
   });
   $('#detail-back').addEventListener('click', closeDetail);
-  $('#sidebar-toggle').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+  setupSheet($('#sidebar'), $('#sheet-handle'), (snapped) => snapped === 'peek' && !$('#detail').hidden && closeDetail());
   $('#about-btn').addEventListener('click', () => $<HTMLDialogElement>('#about').showModal());
   $('#refresh-btn').addEventListener('click', () => {
     clearCache();
@@ -700,19 +708,34 @@ const lifespan = (l: Landmark) => (l.end == null ? `since ${l.start}` : `${l.sta
 
 // ---------------------------------------------------------------------------------------------- detail
 
-function selectView(index: number, fly: boolean) {
+/** Pictures walked through with the next and previous buttons or by swiping, so walking back retraces the steps. */
+let trail: number[] = [];
+
+function selectView(index: number, fly: boolean, step?: 'next' | 'back') {
   const v = state.views[index];
+  if (!step) trail = [index];
   setSelection({ kind: 'view', index });
-  if (fly) map.easeTo({ center: [v.lon, v.lat], zoom: Math.max(map.getZoom(), 16) });
+  reveal([v.lon, v.lat], fly);
+  const image = el(
+    'button',
+    { class: 'detail-image', onclick: () => openLightbox(v.file, v.title), 'aria-label': 'Enlarge picture' },
+    el('img', { src: commonsThumb(v.file, 640), alt: v.title }),
+  );
+  onSwipe(image, (direction) => walk(direction === 'left' ? 'next' : 'back'));
+  const next = nearestUnvisited(index);
   showDetail(
     el(
       'article',
-      { class: 'detail-body' },
-      el(
-        'button',
-        { class: 'detail-image', onclick: () => openLightbox(v.file, v.title), 'aria-label': 'Enlarge photograph' },
-        el('img', { src: commonsThumb(v.file, 640), alt: v.title }),
-      ),
+      { class: `detail-body${step ? ` enter-${step}` : ''}` },
+      image,
+      (next != null || trail.length > 1) &&
+        el(
+          'div',
+          { class: 'walk' },
+          el('button', { class: 'text-btn', disabled: trail.length < 2, onclick: () => walk('back') }, '‹ Back'),
+          el('span', { class: 'walk-hint' }, 'Swipe the picture to wander'),
+          el('button', { class: 'text-btn', disabled: next == null, onclick: () => walk('next') }, 'Next nearby ›'),
+        ),
       el('h2', {}, v.title),
       el(
         'dl',
@@ -749,10 +772,78 @@ function selectView(index: number, fly: boolean) {
   );
 }
 
+/** The closest picture from the selected period that this walk hasn't visited yet. */
+function nearestUnvisited(from: number): number | null {
+  const origin = state.views[from];
+  const scale = Math.cos((origin.lat * Math.PI) / 180);
+  let best: number | null = null;
+  let bestDistance = Infinity;
+  for (const { view: v, index } of filteredViews(null)) {
+    if (trail.includes(index)) continue;
+    const distance = ((v.lon - origin.lon) * scale) ** 2 + (v.lat - origin.lat) ** 2;
+    if (distance < bestDistance) [best, bestDistance] = [index, distance];
+  }
+  return best;
+}
+
+function walk(step: 'next' | 'back') {
+  const current = trail.at(-1);
+  if (current == null) return;
+  if (step === 'back') {
+    if (trail.length < 2) return;
+    trail.pop();
+    selectView(trail.at(-1)!, true, 'back');
+  } else {
+    const next = nearestUnvisited(current);
+    if (next == null) return;
+    trail.push(next);
+    selectView(next, true, 'next');
+  }
+  tick();
+}
+
+/** Calls back on a horizontal swipe across `target`, and swallows the click that ends it. */
+function onSwipe(target: HTMLElement, swiped: (direction: 'left' | 'right') => void) {
+  let start: { x: number; y: number } | null = null;
+  let swallowClick = false;
+  target.addEventListener('pointerdown', (e) => (start = { x: e.clientX, y: e.clientY }));
+  target.addEventListener('pointerup', (e) => {
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    start = null;
+    if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    swallowClick = true;
+    swiped(dx < 0 ? 'left' : 'right');
+  });
+  target.addEventListener('pointercancel', () => (start = null));
+  target.addEventListener(
+    'click',
+    (e) => {
+      if (!swallowClick) return;
+      swallowClick = false;
+      e.stopImmediatePropagation();
+    },
+    { capture: true },
+  );
+}
+
+/**
+ * Brings a point into view: zoomed in when `zoomIn`, otherwise only if the bottom sheet would hide it.
+ * On phones the point lands in the middle of the map left visible above the sheet.
+ */
+function reveal(lngLat: [number, number], zoomIn: boolean) {
+  if (isNarrow() && sheetState() === 'peek') setSheet('half');
+  const cover = sheetCover();
+  const offset: [number, number] = [0, -cover / 2];
+  if (zoomIn) return map.easeTo({ center: lngLat, zoom: Math.max(map.getZoom(), 16), offset });
+  if (cover && map.project(lngLat).y > map.getContainer().clientHeight - cover - 24) map.easeTo({ center: lngLat, offset });
+}
+
 function selectLandmark(index: number, fly: boolean) {
   const l = state.landmarks[index];
   setSelection({ kind: 'landmark', index });
-  if (fly) map.easeTo({ center: [l.lon, l.lat], zoom: Math.max(map.getZoom(), 16) });
+  reveal([l.lon, l.lat], fly);
   showDetail(
     el(
       'article',
@@ -785,7 +876,8 @@ function showDetail(content: HTMLElement) {
   $('#detail-content').replaceChildren(content);
   $('#browse').hidden = true;
   $('#detail').hidden = false;
-  $('#sidebar').classList.add('open');
+  $('#detail').scrollTop = 0;
+  if (isNarrow() && sheetState() === 'peek') setSheet('half');
 }
 
 function closeDetail() {
@@ -983,7 +1075,13 @@ function setupMapInteraction() {
   map.on('click', (e) => {
     if (placement.active) return;
     const feature = featureAt(e.point);
-    if (!feature) return;
+    if (!feature) {
+      // On phones, a tap on empty map puts the sheet away.
+      if (!isNarrow() || sheetState() === 'peek') return;
+      if (!$('#detail').hidden) closeDetail();
+      return setSheet('peek');
+    }
+    tap();
     if (feature.layer.id === 'landmarks') selectLandmark(Number(feature.id), false);
     else selectView(Number(feature.id), false);
   });
@@ -1025,6 +1123,8 @@ function setSelection(selection: Selection | null) {
 
 /** Highlights a feature on the map and shows a thumbnail preview for photographs and landmarks. */
 function setHover(key: string | null) {
+  // Touch screens send mouse events with every tap; there the selection shows in the sheet instead.
+  if (key && !CAN_HOVER.matches) return;
   if (key === state.hovered) return;
   if (state.hovered) setFeatureState(state.hovered, { hover: false });
   state.hovered = key;
