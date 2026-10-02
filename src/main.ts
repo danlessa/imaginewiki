@@ -29,11 +29,12 @@ import {
   type CommonsFile,
   type CommonsPosition,
 } from './commons.ts';
-import { CITIES, DEFAULT_CITY, DEFAULT_YEAR, MAX_YEAR, MIN_YEAR, OHM_STYLE, type HistoricMap } from './config.ts';
+import { CITIES, DEFAULT_CITY, DEFAULT_YEAR, MAX_YEAR, MIN_YEAR, OHM_STYLE, type City, type HistoricMap } from './config.ts';
 import { $, el } from './dom.ts';
 import { DEFAULT_FOV, landmarkPoints, mapFootprints, viewCones, viewPoints } from './geo.ts';
 import { LayerStack } from './layers.ts';
 import { PlacementTool, type Placement } from './locate.ts';
+import { MyLocationControl } from './mylocation.ts';
 import { applyDateFilter, softenBasemap, styleFont } from './ohm.ts';
 import { compareMaps, loadHistoricMaps } from './warper.ts';
 import { loadLandmarks, loadPaintings, loadViews, quickStatementsUrl, type Landmark, type View } from './wikidata.ts';
@@ -93,6 +94,7 @@ const map = new MapLibreMap({
   attributionControl: false,
 });
 map.addControl(new NavigationControl(), 'top-right');
+map.addControl(new MyLocationControl(city, (other, [lng, lat]) => switchCity(other, `16/${lat}/${lng}`)), 'top-right');
 map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
 map.addControl(new AttributionControl({ compact: true, customAttribution: ATTRIBUTION }), 'bottom-right');
 
@@ -492,11 +494,7 @@ function setupSidebar() {
 
   const citySelect = $<HTMLSelectElement>('#city');
   citySelect.replaceChildren(...CITIES.map((c) => el('option', { value: c.id, selected: c === city }, c.name)));
-  citySelect.addEventListener('change', () => {
-    // Every layer is loaded for a single city, so switching starts afresh at the new city's centre.
-    location.hash = `city=${citySelect.value}&year=${state.year}`;
-    location.reload();
-  });
+  citySelect.addEventListener('change', () => switchCity(CITIES.find((c) => c.id === citySelect.value)!));
   $('#subtitle').textContent = `${city.name} through time, from Wikimedia and OpenHistoricalMap`;
   document.title = `imagineWiki · ${city.name} through time`;
   $('#georef').hidden = !city.mapCategories.length;
@@ -504,6 +502,12 @@ function setupSidebar() {
   const lightbox = $('#lightbox');
   lightbox.addEventListener('click', () => (lightbox.hidden = true));
   document.addEventListener('keydown', (e) => e.key === 'Escape' && (lightbox.hidden = true));
+}
+
+/** Every layer is loaded for a single city, so switching starts afresh, at the city's centre unless a `map` camera is given. */
+function switchCity(next: City, camera?: string) {
+  location.hash = `city=${next.id}&year=${state.year}${camera ? `&map=${camera}` : ''}`;
+  location.reload();
 }
 
 function selectTab(tab: Tab) {

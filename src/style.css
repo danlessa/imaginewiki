@@ -709,6 +709,71 @@ a.btn {
   cursor: grab;
 }
 
+/* ------------------------------------------------------------------ my location */
+
+.my-location-control {
+  position: relative;
+}
+
+.maplibregl-ctrl-group .my-location-toggle {
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+}
+
+.maplibregl-ctrl-group .my-location-toggle.active {
+  color: #1a73e8;
+}
+
+.maplibregl-ctrl-group .my-location-toggle.pending svg {
+  animation: my-location-wait 1.2s ease-in-out infinite;
+}
+
+@keyframes my-location-wait {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.my-location-notice {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 8px);
+  width: max-content;
+  max-width: min(260px, calc(100vw - 80px));
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.18);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--landmark);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.my-location-dot {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #1a73e8;
+  box-shadow: 0 0 0 0 rgb(26 115 232 / 0.5);
+  animation: my-location-pulse 2s ease-out infinite;
+}
+
+@keyframes my-location-pulse {
+  to {
+    box-shadow: 0 0 0 14px rgb(26 115 232 / 0);
+  }
+}
+
 /* ------------------------------------------------------------------ layer control */
 
 .layer-control {

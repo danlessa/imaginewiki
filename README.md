@@ -39,6 +39,8 @@ npx cap open ios       # Xcode (macOS only)
 
 Icons and splash screens are generated from `assets/` with `npx capacitor-assets generate`.
 
+The location button on the map shows where the reader is, through the system location prompt in the apps and the browser's on the website, and offers to switch city when they are in another one. The position stays on the device. The privacy policy for both store listings is [`public/privacy.html`](public/privacy.html), published at <https://imaginewiki.abiru.to/privacy.html>. In the store privacy forms, the app collects no data: no accounts, analytics or ads, and the location is not sent anywhere.
+
 **Android.** Create an upload key once and keep it and its passwords safe; Google Play re-signs the app with its own key.
 
 ```bash
