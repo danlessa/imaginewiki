@@ -27,6 +27,37 @@ npm run snapshot:commons  # rescan Commons for historical photographs (takes sev
 
 The build is a static site with relative paths, so `dist/` can be served from any host or subdirectory (for example GitHub Pages).
 
+## Mobile apps
+
+The Android and iOS apps wrap the same build with [Capacitor](https://capacitorjs.com/) (`capacitor.config.ts`, app ID `to.abiru.imaginewiki`). The web files are bundled into the app; the data still loads live as on the website. Links open in the system browser.
+
+```bash
+npm run sync           # build and copy dist/ into android/ and ios/
+npx cap open android   # Android Studio
+npx cap open ios       # Xcode (macOS only)
+```
+
+Icons and splash screens are generated from `assets/` with `npx capacitor-assets generate`.
+
+**Android.** Create an upload key once and keep it and its passwords safe; Google Play re-signs the app with its own key.
+
+```bash
+keytool -genkeypair -v -keystore android/upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Then write `android/keystore.properties` (both files are ignored by git):
+
+```properties
+storeFile=upload.jks
+storePassword=…
+keyAlias=upload
+keyPassword=…
+```
+
+`cd android && ./gradlew bundleRelease` produces `android/app/build/outputs/bundle/release/app-release.aab` for the Play Console. Raise `versionCode` and `versionName` in `android/app/build.gradle` for every upload.
+
+**iOS.** On a Mac with Xcode, run `npm run sync`, open the project, pick the team under Signing & Capabilities, then Product → Archive and upload to App Store Connect. Raise the version and build number in the target's General tab for every upload.
+
 ## Cities
 
 Cities are defined in `src/config.ts` (centre, zoom, bounding box and the Commons photo categories offered in the Locate tab), and the first entry is the default. Switch with the selector in the top bar or the `city` URL parameter, e.g. `#city=rio`. Run `npm run snapshot:maps` and `npm run snapshot:commons` after adding a city.
